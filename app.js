@@ -1,4 +1,4 @@
-import { fetchDefiLlamaFeesSummary, fetchDefiLlamaRevenueSummary } from "./lib/defillama.js";
+import { fetchDefiLlamaBuybackSummary, fetchDefiLlamaFeesSummary, fetchDefiLlamaRevenueSummary } from "./lib/defillama.js";
 import { HYPERLIQUID_ASSISTANCE_FUND, fetchHyperliquidAssistanceFundData } from "./lib/hyperliquid.js";
 import { getBuybackIntensity, getProjectScore, getProjection, getSignalFromScore, getTrend } from "./lib/calculations.js";
 
@@ -8,12 +8,13 @@ const projects = [
     name: "Hyperliquid",
     token: "HYPE",
     category: "Perp DEX",
-    defillamaSlug: "hyperliquid-perps",
+    defillamaSlug: "hyperliquid",
+    defillamaBuybackSlug: "hyperliquid",
     assistanceFundAddress: HYPERLIQUID_ASSISTANCE_FUND,
     dataConfidence: "high",
     buybackType: "actual_disclosed",
-    buybackSource: "Hyperliquid public Assistance Fund",
-    description: "Perp 거래량과 수수료가 프로젝트 수익으로 이어지고, Assistance Fund의 자체 토큰 매입으로 토큰 매수압을 추적하기 좋은 대표 사례입니다.",
+    buybackSource: "DefiLlama Token Buy Back / Holder Net Income",
+    description: "Perp와 spot 거래 수수료가 Assistance Fund 시스템 주소로 귀속되고, 공개 집계상 Token Buy Back / Token Holder Net Income으로 잡히는 대표 사례입니다. 해당 주소의 HYPE는 재단 공지 기준 소각으로 간주합니다.",
     lastUpdated: "2026-06-27 15:30 KST · 샘플",
     price: 39.42,
     expectedAverageTokenPrice: 42.0,
@@ -25,6 +26,15 @@ const projects = [
     monthlyRevenue: [38.4, 41.7, 47.8, 52.5, 58.2, 61.55],
     monthlyBuyback: [34.6, 37.2, 42.9, 47.6, 53.1, 56.63],
     monthlyVolume: [181, 194, 210, 226, 238, 244],
+    cumulativeBuybackUsd: 1182320040,
+    assistanceFundHype: 44690000,
+    sourceLinks: [
+      { label: "Hyperliquid Docs", url: "https://hyperliquid.gitbook.io/hyperliquid-docs/trading/fees" },
+      { label: "Foundation Notice", url: "https://x.com/HyperFND/status/2001127850754367525" },
+      { label: "Hypurrscan", url: "https://hypurrscan.io/address/0xfefefefefefefefefefefefefefefefefefefefe" },
+      { label: "DefiLlama", url: "https://defillama.com/protocol/hyperliquid" },
+      { label: "HYPE Burns", url: "https://www.buildix.trade/hype-burns" },
+    ],
     buybackEvents: [
       { date: "2026-06-27", txHash: "sample-hype-20260627", tokenAmount: 49924, usd: 1968000, price: 39.42, source: "sample Assistance Fund", buybackType: "actual_disclosed" },
       { date: "2026-05-31", txHash: "sample-hype-20260531", tokenAmount: 1347032, usd: 53100000, price: 39.42, source: "sample Assistance Fund", buybackType: "actual_disclosed" },
@@ -221,9 +231,9 @@ function isActualBuyback(project) {
 }
 
 function buybackTypeLabel(type) {
-  if (type === "actual_onchain") return "actual fills";
-  if (type === "actual_disclosed") return "public account";
-  return "estimated model";
+  if (type === "actual_onchain") return "실제 체결";
+  if (type === "actual_disclosed") return "공개 집계";
+  return "추정 모델";
 }
 
 function eventsSince(events, days) {
@@ -249,9 +259,10 @@ function monthlyBuybacksFromEvents(events, monthsBack = 6) {
 }
 
 async function refreshProjectData(project) {
-  const [feesResult, revenueResult] = await Promise.allSettled([
+  const [feesResult, revenueResult, buybackResult] = await Promise.allSettled([
     fetchDefiLlamaFeesSummary(project.defillamaSlug),
     fetchDefiLlamaRevenueSummary(project.defillamaSlug),
+    project.id === "hyperliquid" ? fetchDefiLlamaBuybackSummary(project.defillamaBuybackSlug || project.defillamaSlug) : Promise.resolve(null),
   ]);
 
   const next = { ...project, daily: { ...project.daily }, sevenDay: { ...project.sevenDay }, thirtyDay: { ...project.thirtyDay } };
@@ -280,20 +291,35 @@ async function refreshProjectData(project) {
     sources.push("DefiLlama revenue");
   }
 
+  if (buybackResult.status === "fulfilled" && buybackResult.value) {
+    const buyback = buybackResult.value;
+    next.daily.buyback = buyback.dailyBuyback;
+    next.sevenDay.buyback = buyback.sevenDayBuyback;
+    next.thirtyDay.buyback = buyback.thirtyDayBuyback;
+    next.monthlyBuyback = normalizeMonthly(buyback.monthlyBuyback, project.monthlyBuyback);
+    next.cumulativeBuybackUsd = buyback.cumulativeBuyback;
+    next.latestBuybackDate = buyback.latestDate;
+    next.buybackType = "actual_disclosed";
+    next.buybackSource = "DefiLlama Token Buy Back / Holder Net Income";
+    sources.push("DefiLlama buyback");
+  }
+
   if (next.id === "hyperliquid" && isValidEvmAddress(next.assistanceFundAddress)) {
-    const afData = await fetchHyperliquidAssistanceFundData(next.assistanceFundAddress, 180);
+    const afData = await fetchHyperliquidAssistanceFundData(next.assistanceFundAddress, 30);
     const buyEvents = afData.events.sort((a, b) => Date.parse(b.date) - Date.parse(a.date));
 
     if (buyEvents.length) {
       next.buybackEvents = buyEvents.slice(0, 25);
-      next.buybackType = "actual_onchain";
-      next.buybackSource = "Hyperliquid Assistance Fund fills";
-      next.daily.buyback = eventsSince(buyEvents, 1).reduce((sum, item) => sum + item.usd, 0);
-      next.sevenDay.buyback = eventsSince(buyEvents, 7).reduce((sum, item) => sum + item.usd, 0);
-      next.thirtyDay.buyback = eventsSince(buyEvents, 30).reduce((sum, item) => sum + item.usd, 0);
-      next.monthlyBuyback = monthlyBuybacksFromEvents(buyEvents);
+      if (!next.cumulativeBuybackUsd) {
+        next.buybackType = "actual_onchain";
+        next.buybackSource = "Hyperliquid Assistance Fund fills";
+        next.daily.buyback = eventsSince(buyEvents, 1).reduce((sum, item) => sum + item.usd, 0);
+        next.sevenDay.buyback = eventsSince(buyEvents, 7).reduce((sum, item) => sum + item.usd, 0);
+        next.thirtyDay.buyback = eventsSince(buyEvents, 30).reduce((sum, item) => sum + item.usd, 0);
+        next.monthlyBuyback = monthlyBuybacksFromEvents(buyEvents);
+      }
       sources.push("Hyperliquid fills");
-    } else if (afData.hypeBalance.entryNotionalUsd > 0) {
+    } else if (!next.cumulativeBuybackUsd && afData.hypeBalance.entryNotionalUsd > 0) {
       next.buybackType = "actual_disclosed";
       next.buybackSource = "Hyperliquid Assistance Fund spot state";
       next.thirtyDay.buyback = afData.hypeBalance.entryNotionalUsd;
@@ -421,14 +447,25 @@ function renderProjectHero(project) {
   $("#projectSignal").setAttribute("aria-label", `시그널 ${derived.signal}, 점수 ${derived.score}점`);
   $("#projectDescription").textContent = project.description;
   $("#lastUpdated").textContent = project.lastUpdated;
+  $("#projectSourceLinks").innerHTML = (project.sourceLinks || [])
+    .map((link) => `<a href="${escapeHtml(link.url)}" target="_blank" rel="noreferrer">${escapeHtml(link.label)}</a>`)
+    .join("");
 
   const metrics = [
     { label: "24h Revenue", value: formatCurrency(project.daily.revenue), sub: "프로젝트 수익성" },
     { label: "7d Revenue", value: formatCurrency(project.sevenDay.revenue), sub: "최근 7일 수익" },
     { label: "30d Buyback", value: formatCurrency(project.thirtyDay.buyback), sub: `${formatPercent(project.revenueToBuybackRatio)} of revenue · ${buybackTypeLabel(project.buybackType)}` },
+  ];
+  if (project.cumulativeBuybackUsd) {
+    metrics.push({ label: "Cumulative Buyback", value: formatCurrency(project.cumulativeBuybackUsd), sub: `DefiLlama 기준${project.latestBuybackDate ? ` · ${project.latestBuybackDate}` : ""}` });
+  }
+  if (project.assistanceFundHype) {
+    metrics.push({ label: "AF HYPE Removed", value: `${formatNumber(project.assistanceFundHype, 0)} ${project.token}`, sub: "Assistance Fund 보유분, 소각 간주" });
+  }
+  metrics.push(
     { label: project.tvl ? "TVL" : "Market Cap", value: formatCurrency(project.tvl || project.marketCap), sub: project.tvl ? "Lending 대체 지표" : `${project.token} 기준 시가총액` },
     { label: "Expected Avg Price", value: formatCurrency(project.expectedAverageTokenPrice, false), sub: "예상 매입 수량 계산 기준" },
-  ];
+  );
 
   $("#projectMetrics").innerHTML = metrics
     .map((metric) => `

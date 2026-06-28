@@ -509,6 +509,27 @@ main {
   font-size: 13px;
 }
 
+.source-links {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 12px;
+}
+
+.source-links a {
+  display: inline-flex;
+  align-items: center;
+  min-height: 28px;
+  padding: 0 9px;
+  border: 1px solid rgba(92, 119, 158, 0.25);
+  border-radius: 8px;
+  color: #90f2d0;
+  background: rgba(57, 214, 162, 0.08);
+  font-size: 11px;
+  font-weight: 800;
+  text-decoration: none;
+}
+
 .source-box {
   flex: 0 0 auto;
   min-width: 164px;
@@ -533,7 +554,7 @@ main {
 
 .metric-strip {
   display: grid;
-  grid-template-columns: repeat(5, minmax(0, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
   gap: 12px;
 }
 

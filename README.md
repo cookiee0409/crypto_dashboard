@@ -14,7 +14,7 @@ python -m http.server 4173
 
 ## 데이터 구조
 
-- `lib/defillama.js`: DefiLlama fees/revenue summary API 연동
+- `lib/defillama.js`: DefiLlama fees/revenue/buyback summary API 연동
 - `lib/hyperliquid.js`: Hyperliquid info API 연동
 - `lib/calculations.js`: 매수압 점수, 시그널, 예상 매입액 계산
 - `app.js`: 데이터 병합, 렌더링, CSV 내보내기, 설정 저장
@@ -23,7 +23,7 @@ python -m http.server 4173
 
 - 프로젝트별 24h / 7d / 30d 수익 및 바이백 지표
 - DefiLlama protocol slug 기반 공개 수익 데이터 갱신
-- Hyperliquid Assistance Fund 주소 입력 시 사용자 체결 내역 조회 시도
+- Hyperliquid Assistance Fund 주소와 DefiLlama Token Buy Back / Holder Net Income 지표 연동
 - 실제/추정 바이백 구분 및 txHash 포함 CSV 내보내기
 - 요청서 기준 매수압 점수 산식 반영
 - 상시 투자 조언 아님 면책 문구 표시
@@ -34,7 +34,11 @@ python -m http.server 4173
 
 ## Hyperliquid Assistance Fund
 
-- 기본 Assistance Fund 주소는 `0xfefefefefefefefefefefefefefefefefefefefefefe`입니다.
+- 기본 Assistance Fund 주소는 `0xfefefefefefefefefefefefefefefefefefefefe`입니다.
 - Hyperliquid 공개 `info` API의 `portfolio`, `spotClearinghouseState`, `spotMeta`, `userFillsByTime`을 함께 사용합니다.
+- 바이백 규모는 DefiLlama `hyperliquid` parent protocol의 `dailyRevenue` 집계를 Token Buy Back / Token Holder Net Income 기준값으로 사용합니다.
 - `spotMeta`에서 HYPE 토큰 index를 찾아 `@107` 같은 spot pair 심볼을 HYPE 매수 체결로 매핑합니다.
+- 공식 메커니즘 URL: `https://hyperliquid.gitbook.io/hyperliquid-docs/trading/fees`
+- 공식 재단 공지 URL: `https://x.com/HyperFND/status/2001127850754367525`
+- 공식/보조 확인 URL: `https://hypurrscan.io/address/0xfefefefefefefefefefefefefefefefefefefefe`, `https://defillama.com/protocol/hyperliquid`
 - ASXN buybacks API 후보도 확인했지만 현재 DNS 해석이 실패해 기본 데이터 소스로 사용하지 않습니다.
