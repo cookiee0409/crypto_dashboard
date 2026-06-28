@@ -1,0 +1,231 @@
+<!doctype html>
+<html lang="ko">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>코인 프로젝트 수익·바이백 대시보드 MVP</title>
+    <link rel="stylesheet" href="./styles.css" />
+  </head>
+  <body>
+    <div class="app-shell">
+      <header class="topbar">
+        <div>
+          <p class="eyebrow">Crypto Project Revenue Dashboard</p>
+          <h1>프로젝트 수익·바이백 현황</h1>
+        </div>
+        <div class="topbar-actions">
+          <div class="search-box">
+            <span aria-hidden="true">⌕</span>
+            <input id="projectSearch" type="search" placeholder="프로젝트 검색: Hyperliquid, Jupiter..." aria-label="프로젝트 검색" />
+          </div>
+          <button class="ghost-button" id="refreshButton" type="button">데이터 새로고침</button>
+        </div>
+      </header>
+
+      <nav class="tabs" aria-label="대시보드 탭" role="tablist">
+        <button class="tab active" data-tab="dashboard" id="tab-dashboard" role="tab" aria-controls="dashboardTab" aria-selected="true">대시보드</button>
+        <button class="tab" data-tab="buybacks" id="tab-buybacks" role="tab" aria-controls="buybacksTab" aria-selected="false">프로젝트 상세</button>
+        <button class="tab" data-tab="compare" id="tab-compare" role="tab" aria-controls="compareTab" aria-selected="false">프로젝트 비교</button>
+        <button class="tab" data-tab="settings" id="tab-settings" role="tab" aria-controls="settingsTab" aria-selected="false">설정</button>
+      </nav>
+
+      <main>
+        <section class="summary-grid" id="summaryCards" aria-label="핵심 지표"></section>
+        <p class="data-status" id="dataStatus" role="status">샘플 데이터 표시 중 · 데이터 새로고침을 누르면 공개 API 연동을 시도합니다.</p>
+
+        <section class="dashboard-layout" id="dashboardTab" role="tabpanel" aria-labelledby="tab-dashboard">
+          <aside class="panel sidebar-panel">
+            <div class="panel-header compact">
+              <div>
+                <p class="panel-kicker">Watchlist</p>
+                <h2>프로젝트</h2>
+              </div>
+              <span class="pill muted" id="projectCount">0개</span>
+            </div>
+            <div class="category-filter" id="categoryFilter"></div>
+            <div class="project-list" id="projectList"></div>
+          </aside>
+
+          <section class="main-column">
+            <div class="panel hero-panel">
+              <div class="hero-header">
+                <div>
+                  <div class="title-row">
+                    <h2 id="projectTitle">Hyperliquid</h2>
+                    <span class="pill positive" id="projectSignal">강한 매수압</span>
+                  </div>
+                  <p class="project-description" id="projectDescription"></p>
+                </div>
+                <div class="source-box">
+                  <p>마지막 갱신</p>
+                  <strong id="lastUpdated">-</strong>
+                </div>
+              </div>
+
+              <div class="metric-strip" id="projectMetrics"></div>
+            </div>
+
+            <div class="chart-grid">
+              <article class="panel chart-card">
+                <div class="panel-header">
+                  <div>
+                    <p class="panel-kicker">Revenue Engine</p>
+                    <h3>6개월 수익 추세</h3>
+                  </div>
+                  <span class="mini-change positive" id="revenueTrendLabel">+0%</span>
+                </div>
+                <div class="chart-wrap" id="revenueChart"></div>
+              </article>
+
+              <article class="panel chart-card">
+                <div class="panel-header">
+                  <div>
+                    <p class="panel-kicker">Buyback Pressure</p>
+                    <h3>6개월 바이백 추세</h3>
+                  </div>
+                  <span class="mini-change positive" id="buybackTrendLabel">+0%</span>
+                </div>
+                <div class="chart-wrap" id="buybackChart"></div>
+              </article>
+            </div>
+
+            <article class="panel table-card">
+              <div class="panel-header">
+                <div>
+                  <p class="panel-kicker">Recent Events</p>
+                  <h3>최근 바이백 내역</h3>
+                </div>
+                <button class="ghost-button small" id="exportCsvButton" type="button">CSV 내보내기</button>
+              </div>
+              <div class="table-scroll">
+                <table>
+                  <thead>
+                    <tr>
+                      <th>날짜</th>
+                      <th>프로젝트</th>
+                      <th>매입 토큰</th>
+                      <th>금액</th>
+                      <th>평균가</th>
+                      <th>Tx Hash</th>
+                      <th>출처</th>
+                    </tr>
+                  </thead>
+                  <tbody id="buybackTable"></tbody>
+                </table>
+              </div>
+            </article>
+          </section>
+
+          <aside class="panel insight-panel">
+            <div class="panel-header compact">
+              <div>
+                <p class="panel-kicker">AI Signal</p>
+                <h2>매수압 점수</h2>
+              </div>
+            </div>
+
+            <div class="score-ring" id="scoreRing" role="meter" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0" aria-label="매수압 점수">
+              <div>
+                <strong id="scoreValue">0</strong>
+                <span>/100</span>
+              </div>
+            </div>
+
+            <div class="verdict" id="verdictBox"></div>
+
+            <div class="projection-box">
+              <p class="panel-kicker">6개월 예상 매입</p>
+              <h3 id="projectedUsd">-</h3>
+              <p id="projectedToken">-</p>
+            </div>
+
+            <div class="scenario-list" id="scenarioList"></div>
+
+            <div class="risk-box">
+              <p class="panel-kicker">주의 포인트</p>
+              <ul id="riskList"></ul>
+            </div>
+          </aside>
+        </section>
+
+        <section class="hidden" id="compareTab" role="tabpanel" aria-labelledby="tab-compare">
+          <article class="panel table-card full-width">
+            <div class="panel-header">
+              <div>
+                <p class="panel-kicker">Project Comparison</p>
+                <h3>프로젝트별 수익·매수압 비교</h3>
+              </div>
+            </div>
+            <div class="table-scroll">
+              <table>
+                <thead>
+                  <tr>
+                    <th>프로젝트</th>
+                    <th>Token</th>
+                    <th>카테고리</th>
+                    <th>24h 수익</th>
+                    <th>7d 수익</th>
+                    <th>30d 수익</th>
+                    <th>30d 바이백</th>
+                    <th>바이백/수익</th>
+                    <th>연환산 강도</th>
+                    <th>신뢰도</th>
+                    <th>시그널</th>
+                  </tr>
+                </thead>
+                <tbody id="compareTable"></tbody>
+              </table>
+            </div>
+          </article>
+        </section>
+
+        <section class="hidden" id="buybacksTab" role="tabpanel" aria-labelledby="tab-buybacks">
+          <article class="panel full-width">
+            <div class="panel-header">
+              <div>
+                <p class="panel-kicker">Buyback Tracker</p>
+                <h3>프로젝트 상세 · 월별 바이백 누적</h3>
+              </div>
+            </div>
+            <div class="chart-wrap tall" id="monthlyBuybackChart"></div>
+          </article>
+        </section>
+
+        <section class="hidden" id="settingsTab" role="tabpanel" aria-labelledby="tab-settings">
+          <article class="panel full-width settings-panel">
+            <p class="panel-kicker">Settings</p>
+            <h3>데이터 연동 설정</h3>
+            <div class="settings-grid">
+              <div>
+                <label for="defillamaSlugInput">DefiLlama Protocol Slug</label>
+                <input id="defillamaSlugInput" value="hyperliquid-perps" />
+              </div>
+              <div>
+                <label for="assistanceFundInput">Hyperliquid Assistance Fund</label>
+                <input id="assistanceFundInput" value="" placeholder="0x..." />
+              </div>
+              <div>
+                <label for="priceSourceInput">기준 가격 출처</label>
+                <select id="priceSourceInput">
+                  <option>CoinGecko</option>
+                  <option>Hyperliquid API</option>
+                  <option>수동 입력</option>
+                </select>
+              </div>
+            </div>
+            <button class="ghost-button settings-save" id="saveSettingsButton" type="button">설정 저장</button>
+            <p class="disclaimer">
+              DefiLlama 수익 데이터와 Hyperliquid 사용자 체결 데이터 호출을 브라우저에서 시도합니다. 브라우저 CORS 또는 네트워크 제한이 있으면 샘플 데이터로 자동 폴백됩니다.
+            </p>
+          </article>
+        </section>
+      </main>
+
+      <footer class="site-disclaimer">
+        본 대시보드는 공개 데이터 기반의 분석 도구이며 투자 조언이 아닙니다. 표시된 수익, 바이백, 예상 매입액, 매수압 점수는 데이터 지연·누락·추정 로직에 따라 실제 값과 다를 수 있으며, 모든 투자 판단과 책임은 사용자 본인에게 있습니다.
+      </footer>
+    </div>
+
+    <script type="module" src="./app.js"></script>
+  </body>
+</html>

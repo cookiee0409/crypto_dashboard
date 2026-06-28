@@ -1,0 +1,33 @@
+# 코인 프로젝트 수익·바이백 대시보드 MVP
+
+정적 HTML/CSS/JS 기반 대시보드입니다. 샘플 데이터를 기본 폴백으로 두고, 브라우저에서 공개 API 호출이 가능한 경우 실제 데이터로 갱신합니다.
+
+## 실행 방법
+
+정적 파일 서버로 실행하는 것을 권장합니다.
+
+```bash
+python -m http.server 4173
+```
+
+이후 브라우저에서 `http://127.0.0.1:4173`을 엽니다.
+
+## 데이터 구조
+
+- `lib/defillama.js`: DefiLlama fees/revenue summary API 연동
+- `lib/hyperliquid.js`: Hyperliquid info API 연동
+- `lib/calculations.js`: 매수압 점수, 시그널, 예상 매입액 계산
+- `app.js`: 데이터 병합, 렌더링, CSV 내보내기, 설정 저장
+
+## 포함 기능
+
+- 프로젝트별 24h / 7d / 30d 수익 및 바이백 지표
+- DefiLlama protocol slug 기반 공개 수익 데이터 갱신
+- Hyperliquid Assistance Fund 주소 입력 시 사용자 체결 내역 조회 시도
+- 실제/추정 바이백 구분 및 txHash 포함 CSV 내보내기
+- 요청서 기준 매수압 점수 산식 반영
+- 상시 투자 조언 아님 면책 문구 표시
+
+## 주의
+
+브라우저 CORS, 네트워크 제한, API 응답 변경이 있으면 실데이터 갱신이 실패할 수 있으며, 이 경우 샘플/이전 데이터가 유지됩니다. 운영 단계에서는 서버 사이드 프록시, DB 저장, Cron 갱신, 지갑 검증 로직을 추가하는 것이 좋습니다.
