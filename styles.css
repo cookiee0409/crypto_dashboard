@@ -1321,3 +1321,54 @@ tbody tr:hover {
   color: #475569;
   background: #ffffff;
 }
+
+/* Home ranking screen */
+.rank-toggle {
+  display: flex;
+  gap: 6px;
+}
+
+.rank-caption {
+  margin: 0 20px 12px;
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.6;
+}
+
+#homeTable td.num,
+#homeTable th.num {
+  text-align: right;
+}
+
+#homeTable .rank-num {
+  color: var(--muted);
+  font-weight: 800;
+}
+
+#homeTable .rank-name strong,
+#homeTable .rank-name {
+  font-weight: 800;
+}
+
+#homeTable th.rank-active {
+  color: var(--green);
+}
+
+#homeTable td.rank-active {
+  color: var(--green);
+  font-weight: 800;
+  background: color-mix(in srgb, var(--green) 10%, transparent);
+}
+
+.rank-row {
+  cursor: pointer;
+}
+
+.rank-row.active {
+  background: color-mix(in srgb, var(--blue) 12%, transparent);
+}
+
+.rank-row:focus-visible {
+  outline: 2px solid var(--blue);
+  outline-offset: -2px;
+}

@@ -22,7 +22,8 @@ const state = {
   selectedProjectId: "hyperliquid",
   category: "전체",
   search: "",
-  activeTab: "dashboard",
+  activeTab: "home",
+  homeRank: "marketCap",
   compareSort: "revenue",
   isRefreshing: false,
   status: "샘플 데이터 표시 중 · 데이터 새로고침을 누르면 공개 API 연동을 시도합니다.",
@@ -299,6 +300,77 @@ function renderSummaryCards() {
       </article>
     `)
     .join("");
+}
+
+function homeRankValue(project, key) {
+  if (key === "revenue") return Number(project.thirtyDay?.revenue) || 0;
+  return Number(project.marketCap) || 0;
+}
+
+function renderHome() {
+  const key = state.homeRank;
+  $$("#homeRankToggle .chip").forEach((chip) => chip.classList.toggle("active", chip.dataset.rank === key));
+
+  const caption = {
+    marketCap: "시가총액(Market Cap) 높은 순으로 정렬했습니다. 토글로 매출 기준 순위로 전환할 수 있습니다.",
+    revenue: "최근 30일 프로토콜 매출 높은 순으로 정렬했습니다. 토글로 시가총액 기준 순위로 전환할 수 있습니다.",
+  };
+  $("#homeRankCaption").textContent = caption[key];
+
+  const sorted = [...projects].sort((a, b) => homeRankValue(b, key) - homeRankValue(a, key));
+  const mcapActive = key === "marketCap" ? " rank-active" : "";
+  const revenueActive = key === "revenue" ? " rank-active" : "";
+
+  const head = `
+    <thead>
+      <tr>
+        <th>#</th>
+        <th>프로젝트</th>
+        <th>카테고리</th>
+        <th class="num${mcapActive}">시가총액</th>
+        <th class="num">FDV</th>
+        <th class="num${revenueActive}">30d 매출</th>
+        <th class="num">30d 바이백</th>
+        <th class="num">바이백 수익률</th>
+        <th>매수압</th>
+      </tr>
+    </thead>`;
+
+  const body = sorted
+    .map((project, index) => {
+      const derived = applyDerivedSignal(project);
+      return `
+        <tr class="rank-row ${project.id === state.selectedProjectId ? "active" : ""}" data-project-id="${escapeHtml(project.id)}" tabindex="0" role="button" aria-label="${escapeHtml(project.name)} 상세 보기">
+          <td class="rank-num">${index + 1}</td>
+          <td class="rank-name">${escapeHtml(project.name)}<span class="subtext">${escapeHtml(project.token)}</span></td>
+          <td>${escapeHtml(project.category)}</td>
+          <td class="num${mcapActive}">${formatCurrency(project.marketCap)}</td>
+          <td class="num">${formatCurrency(project.fdv)}</td>
+          <td class="num${revenueActive}">${formatCurrency(project.thirtyDay.revenue)}</td>
+          <td class="num">${formatCurrency(project.thirtyDay.buyback)}</td>
+          <td class="num">${formatPercent(getBuybackYield(project))}</td>
+          <td><span class="pill ${derived.signalType}" title="${escapeHtml(derived.signal)}">${derived.score}</span></td>
+        </tr>
+      `;
+    })
+    .join("");
+
+  $("#homeTable").innerHTML = `${head}<tbody>${body}</tbody>`;
+
+  $$("#homeTable .rank-row").forEach((row) => {
+    const open = () => {
+      state.selectedProjectId = row.dataset.projectId;
+      state.activeTab = "dashboard";
+      render();
+    };
+    row.addEventListener("click", open);
+    row.addEventListener("keydown", (event) => {
+      if (event.key === "Enter" || event.key === " ") {
+        event.preventDefault();
+        open();
+      }
+    });
+  });
 }
 
 function renderCategoryFilter() {
@@ -738,7 +810,7 @@ function renderTabs() {
     tab.setAttribute("aria-selected", String(active));
   });
 
-  ["dashboard", "compare", "buybacks", "settings"].forEach((tabId) => {
+  ["home", "dashboard", "compare", "buybacks", "settings"].forEach((tabId) => {
     const el = $(`#${tabId}Tab`);
     if (el) el.classList.toggle("hidden", tabId !== state.activeTab);
   });
@@ -768,6 +840,7 @@ function render() {
   const selectedProject = getSelectedProject();
   renderDataStatus();
   renderSummaryCards();
+  renderHome();
   renderCategoryFilter();
   renderProjectList();
   renderProjectHero(selectedProject);
@@ -802,6 +875,13 @@ function initEvents() {
   $("#compareSort").addEventListener("change", (event) => {
     state.compareSort = event.target.value;
     renderCompareTable();
+  });
+
+  $$("#homeRankToggle .chip").forEach((chip) => {
+    chip.addEventListener("click", () => {
+      state.homeRank = chip.dataset.rank;
+      renderHome();
+    });
   });
 }
 
