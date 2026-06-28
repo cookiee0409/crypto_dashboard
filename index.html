@@ -34,6 +34,22 @@
         <section class="summary-grid" id="summaryCards" aria-label="핵심 지표"></section>
         <p class="data-status" id="dataStatus" role="status">샘플 데이터 표시 중 · 데이터 새로고침을 누르면 공개 API 연동을 시도합니다.</p>
 
+        <section class="panel summary-rank-panel hidden" id="summaryRankPanel">
+          <div class="panel-header">
+            <div>
+              <p class="panel-kicker" id="summaryRankKicker">Ranking</p>
+              <h3 id="summaryRankTitle">랭킹</h3>
+            </div>
+            <button class="ghost-button small" id="closeSummaryRankButton" type="button">닫기</button>
+          </div>
+          <div class="table-scroll">
+            <table>
+              <thead id="summaryRankHead"></thead>
+              <tbody id="summaryRankBody"></tbody>
+            </table>
+          </div>
+        </section>
+
         <section id="homeTab" role="tabpanel" aria-labelledby="tab-home">
           <article class="panel table-card full-width">
             <div class="panel-header">

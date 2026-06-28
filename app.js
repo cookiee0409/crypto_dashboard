@@ -24,6 +24,7 @@ const state = {
   search: "",
   activeTab: "home",
   homeRank: "marketCap",
+  activeSummaryRank: null,
   compareSort: "revenue",
   isRefreshing: false,
   status: "샘플 데이터 표시 중 · 데이터 새로고침을 누르면 공개 API 연동을 시도합니다.",
@@ -84,6 +85,78 @@ function renderMetricCells(items) {
     `)
     .join("");
 }
+
+const summaryRankConfig = {
+  revenue: {
+    kicker: "Revenue Ranking",
+    title: "30일 매출 Top 10",
+    columns: ["순위", "프로젝트", "카테고리", "30일 매출", "시가총액", "FDV/Revenue"],
+    sort: (a, b) => (b.thirtyDay?.revenue || 0) - (a.thirtyDay?.revenue || 0),
+    cells: (project) => [
+      formatCurrency(project.thirtyDay?.revenue),
+      formatCurrency(project.marketCap),
+      formatRatio(getValuation(project).fdvToRevenue),
+    ],
+  },
+  buyback: {
+    kicker: "Buyback Ranking",
+    title: "30일 바이백 Top 10",
+    columns: ["순위", "프로젝트", "카테고리", "30일 바이백", "Holder Revenue", "환원 방식"],
+    sort: (a, b) => (b.thirtyDay?.buyback || 0) - (a.thirtyDay?.buyback || 0),
+    cells: (project) => [
+      formatCurrency(project.thirtyDay?.buyback),
+      formatCurrency(project.thirtyDay?.holderRevenue),
+      valueCaptureLabel(project.valueCaptureType),
+    ],
+  },
+  buybackYield: {
+    kicker: "Buyback Yield Ranking",
+    title: "바이백 수익률 Top 10",
+    columns: ["순위", "프로젝트", "카테고리", "바이백 수익률", "연환산 바이백", "시가총액"],
+    sort: (a, b) => getBuybackYield(b) - getBuybackYield(a),
+    cells: (project) => [
+      formatPercent(getBuybackYield(project)),
+      formatCurrency(getAnnualizedBuyback(project)),
+      formatCurrency(project.marketCap),
+    ],
+  },
+  unlockRisk: {
+    kicker: "Unlock Risk Ranking",
+    title: "언락 위험 Top 10",
+    columns: ["순위", "프로젝트", "카테고리", "언락 위험", "압력", "90일 언락"],
+    sort: (a, b) => getUnlockRisk(b).score - getUnlockRisk(a).score || getUnlockPressureRatio(b) - getUnlockPressureRatio(a),
+    cells: (project) => [
+      getUnlockRisk(project).label,
+      `${getUnlockPressureRatio(project).toFixed(2)}일치`,
+      formatCurrency(project.unlocks?.next90dUsd),
+    ],
+  },
+  fdvRevenue: {
+    kicker: "Valuation Ranking",
+    title: "FDV/Revenue 낮은 순 Top 10",
+    columns: ["순위", "프로젝트", "카테고리", "FDV/Revenue", "FDV", "연환산 매출"],
+    sort: (a, b) => (getValuation(a).fdvToRevenue ?? Infinity) - (getValuation(b).fdvToRevenue ?? Infinity),
+    cells: (project) => {
+      const valuation = getValuation(project);
+      return [
+        formatRatio(valuation.fdvToRevenue),
+        formatCurrency(project.fdv),
+        formatCurrency(valuation.annualizedRevenue),
+      ];
+    },
+  },
+  usageGrowth: {
+    kicker: "Usage Growth Ranking",
+    title: "실사용 성장 Top 10",
+    columns: ["순위", "프로젝트", "카테고리", "6개월 성장", "MAU", "사용량 추세"],
+    sort: (a, b) => getTrend(b.usage?.userGrowth6m || []) - getTrend(a.usage?.userGrowth6m || []),
+    cells: (project) => [
+      formatPercent(getTrend(project.usage?.userGrowth6m || [])),
+      formatNumber(project.usage?.mau),
+      getUsageTrendLabel(project.usage?.usageTrend).label,
+    ],
+  },
+};
 
 function shortHash(hash) {
   if (!hash) return "-";
@@ -283,23 +356,88 @@ function renderDataStatus() {
 function renderSummaryCards() {
   const highlights = getDashboardHighlights(projects);
   const cards = [
-    { label: "30일 매출 1위", value: highlights.byRevenue?.name, sub: formatCurrency(highlights.byRevenue?.thirtyDay?.revenue) },
-    { label: "30일 바이백 1위", value: highlights.byBuyback?.name, sub: formatCurrency(highlights.byBuyback?.thirtyDay?.buyback) },
-    { label: "바이백 수익률 1위", value: highlights.byYield?.name, sub: formatPercent(getBuybackYield(highlights.byYield)) },
-    { label: "언락 위험 최고", value: highlights.byUnlock?.name, sub: `${getUnlockRisk(highlights.byUnlock).label} · ${getUnlockPressureRatio(highlights.byUnlock).toFixed(2)}일치` },
-    { label: "FDV/Revenue 저평가", value: highlights.byCheap?.name, sub: formatRatio(getValuation(highlights.byCheap).fdvToRevenue) },
-    { label: "실사용 성장 1위", value: highlights.byUsage?.name, sub: getTrendLabel(highlights.byUsage?.usage?.userGrowth6m || []).label },
+    { rank: "revenue", label: "30일 매출 1위", value: highlights.byRevenue?.name, sub: formatCurrency(highlights.byRevenue?.thirtyDay?.revenue) },
+    { rank: "buyback", label: "30일 바이백 1위", value: highlights.byBuyback?.name, sub: formatCurrency(highlights.byBuyback?.thirtyDay?.buyback) },
+    { rank: "buybackYield", label: "바이백 수익률 1위", value: highlights.byYield?.name, sub: formatPercent(getBuybackYield(highlights.byYield)) },
+    { rank: "unlockRisk", label: "언락 위험 최고", value: highlights.byUnlock?.name, sub: `${getUnlockRisk(highlights.byUnlock).label} · ${getUnlockPressureRatio(highlights.byUnlock).toFixed(2)}일치` },
+    { rank: "fdvRevenue", label: "FDV/Revenue 저평가", value: highlights.byCheap?.name, sub: formatRatio(getValuation(highlights.byCheap).fdvToRevenue) },
+    { rank: "usageGrowth", label: "실사용 성장 1위", value: highlights.byUsage?.name, sub: getTrendLabel(highlights.byUsage?.usage?.userGrowth6m || []).label },
   ];
 
   $("#summaryCards").innerHTML = cards
     .map((card) => `
-      <article class="summary-card">
+      <article class="summary-card clickable ${state.activeSummaryRank === card.rank ? "active" : ""}" data-rank="${escapeHtml(card.rank)}" tabindex="0" role="button" aria-label="${escapeHtml(card.label)} 랭킹 열기">
         <p class="label">${escapeHtml(card.label)}</p>
         <div class="value">${escapeHtml(card.value)}</div>
         <div class="sub">${escapeHtml(card.sub)}</div>
       </article>
     `)
     .join("");
+
+  $$("#summaryCards .summary-card").forEach((card) => {
+    const open = () => {
+      state.activeSummaryRank = card.dataset.rank;
+      renderSummaryRankPanel();
+      renderSummaryCards();
+    };
+    card.addEventListener("click", open);
+    card.addEventListener("keydown", (event) => {
+      if (event.key === "Enter" || event.key === " ") {
+        event.preventDefault();
+        open();
+      }
+    });
+  });
+}
+
+function renderSummaryRankPanel() {
+  const rankKey = state.activeSummaryRank;
+  const config = summaryRankConfig[rankKey];
+  const panel = $("#summaryRankPanel");
+  if (!config) {
+    panel.classList.add("hidden");
+    $("#summaryRankHead").innerHTML = "";
+    $("#summaryRankBody").innerHTML = "";
+    return;
+  }
+
+  const ranked = [...projects].sort(config.sort).slice(0, 10);
+  $("#summaryRankKicker").textContent = config.kicker;
+  $("#summaryRankTitle").textContent = config.title;
+  $("#summaryRankHead").innerHTML = `
+    <tr>
+      ${config.columns.map((column) => `<th>${escapeHtml(column)}</th>`).join("")}
+    </tr>
+  `;
+  $("#summaryRankBody").innerHTML = ranked
+    .map((project, index) => {
+      const cells = config.cells(project);
+      return `
+        <tr class="summary-rank-row" data-project-id="${escapeHtml(project.id)}" tabindex="0" role="button" aria-label="${escapeHtml(project.name)} 상세 대시보드로 이동">
+          <td class="rank-num">${index + 1}</td>
+          <td class="rank-name">${escapeHtml(project.name)}<span class="subtext">${escapeHtml(project.token)}</span></td>
+          <td>${escapeHtml(project.category)}</td>
+          ${cells.map((cell) => `<td>${escapeHtml(cell)}</td>`).join("")}
+        </tr>
+      `;
+    })
+    .join("");
+  panel.classList.remove("hidden");
+
+  $$("#summaryRankBody .summary-rank-row").forEach((row) => {
+    const open = () => {
+      state.selectedProjectId = row.dataset.projectId;
+      state.activeTab = "dashboard";
+      render();
+    };
+    row.addEventListener("click", open);
+    row.addEventListener("keydown", (event) => {
+      if (event.key === "Enter" || event.key === " ") {
+        event.preventDefault();
+        open();
+      }
+    });
+  });
 }
 
 function homeRankValue(project, key) {
@@ -840,6 +978,7 @@ function render() {
   const selectedProject = getSelectedProject();
   renderDataStatus();
   renderSummaryCards();
+  renderSummaryRankPanel();
   renderHome();
   renderCategoryFilter();
   renderProjectList();
@@ -872,6 +1011,11 @@ function initEvents() {
   $("#refreshButton").addEventListener("click", refreshSelectedProject);
   $("#saveSettingsButton").addEventListener("click", saveSettings);
   $("#exportCsvButton").addEventListener("click", () => exportCsv(getSelectedProject()));
+  $("#closeSummaryRankButton").addEventListener("click", () => {
+    state.activeSummaryRank = null;
+    renderSummaryRankPanel();
+    renderSummaryCards();
+  });
   $("#compareSort").addEventListener("change", (event) => {
     state.compareSort = event.target.value;
     renderCompareTable();

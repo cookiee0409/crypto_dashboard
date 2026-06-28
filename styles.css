@@ -309,6 +309,49 @@ main {
   line-height: 1.7;
 }
 
+.summary-card.clickable {
+  cursor: pointer;
+  transition: transform 0.16s ease, border-color 0.16s ease, box-shadow 0.16s ease, background 0.16s ease;
+}
+
+.summary-card.clickable:hover,
+.summary-card.clickable:focus-visible {
+  border-color: #93c5fd;
+  background: #f8fbff;
+  box-shadow: 0 18px 38px rgba(37, 99, 235, 0.12);
+  transform: translateY(-2px);
+  outline: 0;
+}
+
+.summary-card.active {
+  border-color: #2563eb;
+  background: #eef6ff;
+  box-shadow: 0 18px 42px rgba(37, 99, 235, 0.16);
+}
+
+.summary-rank-panel {
+  margin: -4px 0 16px;
+  overflow: hidden;
+  padding-bottom: 14px;
+}
+
+.summary-rank-panel table {
+  min-width: 760px;
+}
+
+.summary-rank-row {
+  cursor: pointer;
+}
+
+.summary-rank-row:hover {
+  background: #eef6ff;
+}
+
+.summary-rank-row:focus-visible {
+  outline: 2px solid var(--blue);
+  outline-offset: -2px;
+}
+
 .dashboard-layout {
   display: grid;
   grid-template-columns: 300px minmax(0, 1fr) 330px;
