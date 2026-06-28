@@ -540,8 +540,37 @@ main {
 }
 
 .title-row h2 {
+  display: inline-flex;
+  align-items: center;
+  gap: 12px;
   font-size: 22px;
   letter-spacing: 0;
+}
+
+.project-avatar {
+  display: grid;
+  flex: 0 0 auto;
+  width: 44px;
+  height: 44px;
+  place-items: center;
+  border: 1px solid rgba(110, 231, 207, 0.38);
+  border-radius: 12px;
+  color: #07101e;
+  background: linear-gradient(135deg, #6ee7cf, #7aa2ff);
+  box-shadow: inset 0 -12px 18px rgba(7, 16, 30, 0.18), 0 12px 26px rgba(38, 118, 187, 0.16);
+  font-size: 18px;
+  font-weight: 900;
+}
+
+.project-title-copy {
+  display: grid;
+  gap: 4px;
+}
+
+.project-title-copy small {
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 800;
 }
 
 .project-description {
@@ -762,6 +791,386 @@ main {
   color: var(--muted);
   font-size: 13px;
   line-height: 1.7;
+}
+
+.visual-card {
+  min-height: 280px;
+}
+
+.visual-chart {
+  height: 315px;
+  margin: 0 20px 10px;
+}
+
+.chart-legend {
+  display: inline-flex;
+  gap: 10px;
+  align-items: center;
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 800;
+}
+
+.chart-legend span {
+  display: inline-flex;
+  gap: 6px;
+  align-items: center;
+}
+
+.chart-legend span::before,
+.mix-legend i,
+.allocation-legend i {
+  content: "";
+  display: inline-block;
+  width: 9px;
+  height: 9px;
+  border-radius: 999px;
+}
+
+.chart-legend .revenue::before {
+  background: var(--green);
+}
+
+.chart-legend .return::before {
+  background: var(--blue);
+}
+
+.line-path.secondary {
+  stroke: var(--blue);
+}
+
+.chart-dot.secondary {
+  stroke: var(--blue);
+}
+
+.compact-metrics,
+.metric-list {
+  display: grid;
+  gap: 10px;
+  margin: 12px 20px 0;
+}
+
+.compact-metrics {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.compact-metrics.single {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.metric-list {
+  grid-template-columns: 1fr;
+}
+
+.metric-list .metric-item,
+.compact-metrics .metric-item {
+  min-height: auto;
+  padding: 12px;
+}
+
+.metric-list .metric-item {
+  display: grid;
+  grid-template-columns: minmax(120px, 1fr) minmax(110px, auto);
+  gap: 8px 12px;
+  align-items: center;
+}
+
+.metric-list .metric-item p,
+.metric-list .metric-item strong,
+.metric-list .metric-item span {
+  margin: 0;
+}
+
+.metric-list .metric-item span {
+  grid-column: 1 / -1;
+}
+
+.mix-bar,
+.allocation-stack {
+  display: flex;
+  height: 18px;
+  overflow: hidden;
+  margin: 16px 20px 14px;
+  border-radius: 999px;
+  background: rgba(99, 128, 170, 0.16);
+}
+
+.mix-bar span,
+.allocation-stack span {
+  width: var(--w);
+}
+
+.mix-bar .return,
+.mix-legend .return {
+  background: var(--green);
+}
+
+.mix-bar .staking,
+.mix-legend .staking {
+  background: var(--blue);
+}
+
+.mix-bar .retained,
+.mix-legend .retained {
+  background: var(--amber);
+}
+
+.mix-legend,
+.allocation-legend {
+  display: grid;
+  gap: 10px;
+  margin: 0 20px 16px;
+}
+
+.mix-legend div,
+.allocation-legend div {
+  display: grid;
+  grid-template-columns: 12px 1fr auto;
+  gap: 8px;
+  align-items: center;
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.mix-legend strong,
+.allocation-legend strong {
+  color: #dbe6f5;
+}
+
+.value-flow {
+  display: grid;
+  gap: 10px;
+  margin: 14px 20px 20px;
+}
+
+.flow-node {
+  display: grid;
+  grid-template-columns: 36px 1fr;
+  gap: 10px;
+  align-items: center;
+  padding: 12px;
+  border: 1px solid rgba(92, 119, 158, 0.16);
+  border-radius: 10px;
+  background: rgba(12, 25, 43, 0.72);
+}
+
+.flow-node span {
+  color: var(--green);
+  font-size: 11px;
+  font-weight: 900;
+}
+
+.flow-node strong {
+  color: #dbe6f5;
+  font-size: 13px;
+}
+
+.value-flow > b {
+  color: var(--blue);
+  text-align: center;
+}
+
+.usage-panel {
+  margin: 0 20px 20px;
+}
+
+.usage-spark {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  min-height: 72px;
+  margin-bottom: 12px;
+  padding: 8px 0;
+}
+
+.mini-sparkline {
+  width: 100%;
+  height: 58px;
+}
+
+.mini-sparkline path {
+  fill: none;
+  stroke: var(--green);
+  stroke-width: 4;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.empty-mini-chart {
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.usage-stats {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  border-top: 1px solid rgba(92, 119, 158, 0.14);
+}
+
+.usage-stats div {
+  padding: 11px 0;
+  border-bottom: 1px solid rgba(92, 119, 158, 0.14);
+}
+
+.usage-stats span,
+.usage-stats small {
+  display: block;
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 800;
+}
+
+.usage-stats strong {
+  display: block;
+  margin: 5px 0;
+  color: #f6fbff;
+  font-size: 16px;
+}
+
+.peer-bars,
+.timeline-list {
+  display: grid;
+  gap: 12px;
+  margin: 4px 20px 20px;
+}
+
+.peer-row {
+  display: grid;
+  grid-template-columns: 120px 1fr auto;
+  gap: 10px;
+  align-items: center;
+}
+
+.peer-row div {
+  min-width: 0;
+}
+
+.peer-row strong,
+.peer-row span {
+  display: block;
+}
+
+.peer-row strong {
+  overflow: hidden;
+  color: #f6fbff;
+  font-size: 12px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.peer-row span {
+  margin-top: 3px;
+  color: var(--muted);
+  font-size: 10px;
+  font-weight: 800;
+}
+
+.peer-row i,
+.timeline-row i {
+  display: block;
+  height: 9px;
+  border-radius: 999px;
+  background:
+    linear-gradient(90deg, var(--green) var(--w), rgba(99, 128, 170, 0.16) var(--w));
+}
+
+.peer-row.active i {
+  background:
+    linear-gradient(90deg, var(--blue) var(--w), rgba(99, 128, 170, 0.16) var(--w));
+}
+
+.peer-row b,
+.timeline-row strong {
+  color: #dbe6f5;
+  font-size: 12px;
+}
+
+.timeline-meta {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 4px 12px;
+  padding-bottom: 10px;
+  border-bottom: 1px solid rgba(92, 119, 158, 0.14);
+}
+
+.timeline-meta span,
+.timeline-row span {
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 800;
+}
+
+.timeline-meta strong {
+  color: #f6fbff;
+}
+
+.timeline-meta b {
+  grid-column: 1 / -1;
+  color: var(--amber);
+  font-size: 17px;
+}
+
+.timeline-row {
+  display: grid;
+  grid-template-columns: 44px 1fr auto;
+  gap: 10px;
+  align-items: center;
+}
+
+.allocation-stack .team,
+.allocation-legend .team {
+  background: var(--red);
+}
+
+.allocation-stack .vc,
+.allocation-legend .vc {
+  background: var(--amber);
+}
+
+.allocation-stack .foundation,
+.allocation-legend .foundation {
+  background: var(--blue);
+}
+
+.allocation-stack .community,
+.allocation-legend .community {
+  background: var(--green);
+}
+
+.risk-check-wrap {
+  margin: 0 20px;
+  overflow: auto;
+}
+
+.risk-check-table {
+  min-width: 0;
+  white-space: normal;
+}
+
+.risk-check-table th,
+.risk-check-table td {
+  position: static;
+  padding: 11px 10px;
+  background: transparent;
+  text-align: left;
+  vertical-align: middle;
+}
+
+.risk-check-table th {
+  width: 120px;
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.risk-check-table td {
+  color: #ced9e9;
+  line-height: 1.45;
+}
+
+.risk-badges.compact {
+  margin-top: 12px;
 }
 
 .chart-card {
@@ -1144,6 +1553,7 @@ td .subtext {
   .chart-grid,
   .fundamental-grid,
   .metric-strip,
+  .compact-metrics,
   .trust-grid,
   .settings-grid {
     grid-template-columns: 1fr;
@@ -1156,6 +1566,11 @@ td .subtext {
 
   .hero-header {
     flex-direction: column;
+  }
+
+  .metric-list .metric-item,
+  .peer-row {
+    grid-template-columns: 1fr;
   }
 
   .project-list {
@@ -1306,7 +1721,8 @@ body {
 .risk-box,
 .scenario-list .scenario-item,
 .trust-grid div,
-.flow-row span {
+.flow-row span,
+.flow-node {
   border-color: var(--line);
   background: #f8fafc;
 }
@@ -1357,6 +1773,42 @@ tbody tr:hover {
 
 .chart-dot {
   fill: #ffffff;
+}
+
+.flow-node strong,
+.usage-stats strong,
+.peer-row strong,
+.peer-row b,
+.timeline-row strong,
+.timeline-meta strong,
+.mix-legend strong,
+.allocation-legend strong {
+  color: var(--text);
+}
+
+.compact-metrics .metric-item,
+.metric-list .metric-item {
+  background: #f8fafc;
+}
+
+.mix-bar,
+.allocation-stack {
+  background: #e5edf6;
+}
+
+.peer-row i,
+.timeline-row i {
+  background:
+    linear-gradient(90deg, var(--green) var(--w), #e5edf6 var(--w));
+}
+
+.peer-row.active i {
+  background:
+    linear-gradient(90deg, var(--blue) var(--w), #e5edf6 var(--w));
+}
+
+.risk-check-table td {
+  color: #334155;
 }
 
 .site-disclaimer {

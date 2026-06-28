@@ -82,6 +82,9 @@ export function getValuation(project) {
 }
 
 export function getProjectScore(project) {
+  // Project score means token supply-demand impact score.
+  // It estimates how strongly protocol revenue, buybacks, value capture,
+  // usage growth, and unlock pressure may affect token supply/demand.
   const revenueScore = clamp((Number(project.thirtyDay?.revenue) || 0) / 65000000, 0, 1) * 18;
   const returnScore = clamp(getRevenueReturnRatio(project) / 0.75, 0, 1) * 22;
   const trendScore = getTrend(project.monthlyBuyback) > 0 ? 15 : 0;
@@ -95,10 +98,10 @@ export function getProjectScore(project) {
 }
 
 export function getSignalFromScore(score) {
-  if (score >= 80) return { signal: "강한 매수압", signalType: "positive" };
-  if (score >= 60) return { signal: "매수압 우세", signalType: "positive" };
-  if (score >= 40) return { signal: "중립 관찰", signalType: "warning" };
-  return { signal: "매수압 약함", signalType: "negative" };
+  if (score >= 80) return { signal: "수급 효과 강함", signalType: "positive" };
+  if (score >= 60) return { signal: "수급 효과 양호", signalType: "positive" };
+  if (score >= 40) return { signal: "수급 중립", signalType: "warning" };
+  return { signal: "수급 효과 약함", signalType: "negative" };
 }
 
 export function getProjection(project) {

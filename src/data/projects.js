@@ -77,7 +77,7 @@ export const projects = [
       { date: "2026-05-31", txHash: "sample-hype-20260531", tokenAmount: 844735, usd: 53100000, price: 62.86, source: "DefiLlama / Assistance Fund", buybackType: "actual_disclosed" },
       { date: "2026-04-30", txHash: "sample-hype-20260430", tokenAmount: 757238, usd: 47600000, price: 62.86, source: "DefiLlama / Assistance Fund", buybackType: "actual_disclosed" },
     ],
-    risks: ["거래량 의존도가 높아 시장 침체 시 매수압도 약해질 수 있습니다.", "Assistance Fund의 HYPE는 소각 간주이나 일반 EVM 지갑 소각과는 구조가 다릅니다.", "토큰 가격 상승 시 동일 금액으로 매입 가능한 수량은 감소합니다."],
+    risks: ["거래량 의존도가 높아 시장 침체 시 토큰 수급 효과도 약해질 수 있습니다.", "Assistance Fund의 HYPE는 소각 간주이나 일반 EVM 지갑 소각과는 구조가 다릅니다.", "토큰 가격 상승 시 동일 금액으로 매입 가능한 수량은 감소합니다."],
   },
   {
     id: "dydx",
@@ -140,7 +140,7 @@ export const projects = [
     valueFlow: ["USDe 발행·운용 수익", "프로토콜 준비금", "보험/재단 금고", "ENA 직접 환원은 제한적"],
     unlocks: { nextDate: "2026-07-02", nextAmountUsd: 164000000, next30dUsd: 164000000, next90dUsd: 486000000, next180dUsd: 720000000, allocation: { team: 0.3, vc: 0.25, foundation: 0.15, community: 0.3 } },
     usage: { dau: 29000, wau: 132000, mau: 510000, activeWallets: 272000, newWallets: 48000, transactions30d: 1650000, tvlChange30d: 0.11, volumeChange30d: 0.18, usageTrend: "strong_up", userGrowth6m: [0.28, 0.31, 0.35, 0.39, 0.44, 0.51] },
-    riskProfile: { website: "https://ethena.fi", docs: "https://docs.ethena.fi", audited: true, auditors: ["Quantstamp", "Zellic"], githubActive: false, recentCommitDate: null, governance: true, foundationWalletPublic: true, investors: ["Dragonfly", "Binance Labs", "OKX Ventures"], teamVcShare: 0.55, badges: ["팀/VC 물량 과다", "다음 90일 언락 큼", "토큰 환원 구조 간접적"], notes: ["프로토콜 수익은 강하지만 ENA 직접 매수압으로 이어지는 비율은 낮게 봐야 합니다."] },
+    riskProfile: { website: "https://ethena.fi", docs: "https://docs.ethena.fi", audited: true, auditors: ["Quantstamp", "Zellic"], githubActive: false, recentCommitDate: null, governance: true, foundationWalletPublic: true, investors: ["Dragonfly", "Binance Labs", "OKX Ventures"], teamVcShare: 0.55, badges: ["팀/VC 물량 과다", "다음 90일 언락 큼", "토큰 환원 구조 간접적"], notes: ["프로토콜 수익은 강하지만 ENA 직접 수급 효과로 이어지는 비율은 낮게 봐야 합니다."] },
     sourceLinks: [{ label: "Docs", url: "https://docs.ethena.fi" }, { label: "DefiLlama", url: "https://defillama.com/protocol/ethena" }],
     buybackEvents: [],
     risks: ["스테이블 자산 운용 리스크와 펀딩 환경 변화에 민감합니다.", "수익이 ENA 환원으로 직접 연결되는 구조가 약합니다."],

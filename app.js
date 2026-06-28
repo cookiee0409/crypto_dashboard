@@ -111,8 +111,8 @@ const summaryRankConfig = {
   },
   buybackYield: {
     kicker: "Buyback Yield Ranking",
-    title: "바이백 수익률 Top 10",
-    columns: ["순위", "프로젝트", "카테고리", "바이백 수익률", "연환산 바이백", "시가총액"],
+    title: "환원 수익률 Top 10",
+    columns: ["순위", "프로젝트", "카테고리", "환원 수익률", "연환산 환원", "시가총액"],
     sort: (a, b) => getBuybackYield(b) - getBuybackYield(a),
     cells: (project) => [
       formatPercent(getBuybackYield(project)),
@@ -358,7 +358,7 @@ function renderSummaryCards() {
   const cards = [
     { rank: "revenue", label: "30일 매출 1위", value: highlights.byRevenue?.name, sub: formatCurrency(highlights.byRevenue?.thirtyDay?.revenue) },
     { rank: "buyback", label: "30일 바이백 1위", value: highlights.byBuyback?.name, sub: formatCurrency(highlights.byBuyback?.thirtyDay?.buyback) },
-    { rank: "buybackYield", label: "바이백 수익률 1위", value: highlights.byYield?.name, sub: formatPercent(getBuybackYield(highlights.byYield)) },
+    { rank: "buybackYield", label: "환원 수익률 1위", value: highlights.byYield?.name, sub: formatPercent(getBuybackYield(highlights.byYield)) },
     { rank: "unlockRisk", label: "언락 위험 최고", value: highlights.byUnlock?.name, sub: `${getUnlockRisk(highlights.byUnlock).label} · ${getUnlockPressureRatio(highlights.byUnlock).toFixed(2)}일치` },
     { rank: "fdvRevenue", label: "FDV/Revenue 저평가", value: highlights.byCheap?.name, sub: formatRatio(getValuation(highlights.byCheap).fdvToRevenue) },
     { rank: "usageGrowth", label: "실사용 성장 1위", value: highlights.byUsage?.name, sub: getTrendLabel(highlights.byUsage?.usage?.userGrowth6m || []).label },
@@ -377,6 +377,8 @@ function renderSummaryCards() {
   $$("#summaryCards .summary-card").forEach((card) => {
     const open = () => {
       state.activeSummaryRank = card.dataset.rank;
+      state.activeTab = "home";
+      renderTabs();
       renderSummaryRankPanel();
       renderSummaryCards();
     };
@@ -428,6 +430,7 @@ function renderSummaryRankPanel() {
     const open = () => {
       state.selectedProjectId = row.dataset.projectId;
       state.activeTab = "dashboard";
+      state.activeSummaryRank = null;
       render();
     };
     row.addEventListener("click", open);
@@ -469,8 +472,8 @@ function renderHome() {
         <th class="num">FDV</th>
         <th class="num${revenueActive}">30d 매출</th>
         <th class="num">30d 바이백</th>
-        <th class="num">바이백 수익률</th>
-        <th>매수압</th>
+        <th class="num">환원 수익률</th>
+        <th>토큰 수급</th>
       </tr>
     </thead>`;
 
@@ -499,6 +502,7 @@ function renderHome() {
     const open = () => {
       state.selectedProjectId = row.dataset.projectId;
       state.activeTab = "dashboard";
+      state.activeSummaryRank = null;
       render();
     };
     row.addEventListener("click", open);
@@ -559,10 +563,16 @@ function renderProjectList() {
 
 function renderProjectHero(project) {
   const derived = applyDerivedSignal(project);
-  $("#projectTitle").textContent = `${project.name} / ${project.token}`;
+  $("#projectTitle").innerHTML = `
+    <span class="project-avatar" aria-hidden="true">${escapeHtml(project.token?.slice(0, 1) || project.name.slice(0, 1))}</span>
+    <span class="project-title-copy">
+      <span>${escapeHtml(project.name)} / ${escapeHtml(project.token)}</span>
+      <small>${escapeHtml(project.category)} · ${escapeHtml(valueCaptureLabel(project.valueCaptureType))}</small>
+    </span>
+  `;
   $("#projectSignal").textContent = `${derived.signal} · ${derived.score}점`;
   $("#projectSignal").className = `pill ${derived.signalType}`;
-  $("#projectSignal").setAttribute("aria-label", `시그널 ${derived.signal}, 점수 ${derived.score}점`);
+  $("#projectSignal").setAttribute("aria-label", `토큰 수급 진단 ${derived.signal}, 점수 ${derived.score}점`);
   $("#projectDescription").textContent = project.description;
   $("#lastUpdated").textContent = project.lastUpdated;
   $("#projectSourceLinks").innerHTML = (project.sourceLinks || [])
@@ -570,20 +580,11 @@ function renderProjectHero(project) {
     .join("");
 
   const metrics = [
-    { label: "24h Revenue", value: formatCurrency(project.daily.revenue), sub: "프로젝트 수익성" },
-    { label: "7d Revenue", value: formatCurrency(project.sevenDay.revenue), sub: "최근 7일 수익" },
-    { label: "30d Buyback", value: formatCurrency(project.thirtyDay.buyback), sub: `${formatPercent(project.revenueToBuybackRatio)} of revenue · ${buybackTypeLabel(project.buybackType)}` },
+    { label: "30일 매출", value: formatCurrency(project.thirtyDay.revenue), sub: `${getTrendLabel(project.monthlyRevenue).label} · 최근 6개월` },
+    { label: "30일 토큰 환원", value: formatCurrency(project.thirtyDay.buyback), sub: `${buybackTypeLabel(project.buybackType)} 기준` },
+    { label: "토큰 수급 점수", value: `${derived.score} / 100`, sub: derived.signal },
+    { label: "언락 위험도", value: getUnlockRisk(project).label, sub: `${getUnlockPressureRatio(project).toFixed(2)}일치 거래량` },
   ];
-  if (project.cumulativeBuybackUsd) {
-    metrics.push({ label: "Cumulative Buyback", value: formatCurrency(project.cumulativeBuybackUsd), sub: `DefiLlama 기준${project.latestBuybackDate ? ` · ${project.latestBuybackDate}` : ""}` });
-  }
-  if (project.assistanceFundHype) {
-    metrics.push({ label: "AF HYPE Removed", value: `${formatNumber(project.assistanceFundHype, 0)} ${project.token}`, sub: "Assistance Fund 보유분, 소각 간주" });
-  }
-  metrics.push(
-    { label: project.tvl ? "TVL" : "Market Cap", value: formatCurrency(project.tvl || project.marketCap), sub: project.tvl ? "Lending 대체 지표" : `${project.token} 기준 시가총액` },
-    { label: "Expected Avg Price", value: formatCurrency(project.expectedAverageTokenPrice, false), sub: "예상 매입 수량 계산 기준" },
-  );
 
   $("#projectMetrics").innerHTML = metrics
     .map((metric) => `
@@ -628,7 +629,242 @@ function renderAllocation(allocation = {}) {
   `;
 }
 
-function renderFundamentalSections(project) {
+function percentWidth(value, max, min = 2) {
+  if (!max || Number.isNaN(Number(max))) return min;
+  return Math.max(min, Math.min(100, (Number(value || 0) / max) * 100));
+}
+
+function renderSparkline(values = [], title = "추세") {
+  const cleanValues = values.map((value) => Number(value) || 0);
+  if (!cleanValues.length) return `<div class="empty-mini-chart">데이터 없음</div>`;
+  const width = 220;
+  const height = 54;
+  const max = Math.max(...cleanValues, 1);
+  const min = Math.min(...cleanValues);
+  const span = Math.max(max - min, 1);
+  const denominator = Math.max(cleanValues.length - 1, 1);
+  const points = cleanValues.map((value, index) => {
+    const x = (index / denominator) * (width - 10) + 5;
+    const y = height - 8 - ((value - min) / span) * (height - 16);
+    return [x, y];
+  });
+  const line = points.map(([x, y], index) => `${index === 0 ? "M" : "L"}${x},${y}`).join(" ");
+  return `
+    <svg class="mini-sparkline" viewBox="0 0 ${width} ${height}" role="img" aria-label="${escapeHtml(title)}">
+      <title>${escapeHtml(title)}</title>
+      <path d="${line}" />
+    </svg>
+  `;
+}
+
+function createDualLineChart(primaryValues, secondaryValues, labels, title) {
+  const primary = primaryValues.map((value) => Number(value) || 0);
+  const secondary = secondaryValues.map((value) => Number(value) || 0);
+  const allValues = [...primary, ...secondary];
+  if (!allValues.length) return `<div class="empty-chart">표시할 데이터가 없습니다.</div>`;
+  const width = 860;
+  const height = 300;
+  const padding = { top: 24, right: 28, bottom: 38, left: 52 };
+  const max = Math.max(...allValues, 1) * 1.16;
+  const min = Math.min(...allValues, 0);
+  const denominator = Math.max(Math.max(primary.length, secondary.length) - 1, 1);
+  const xScale = (index) => padding.left + (index / denominator) * (width - padding.left - padding.right);
+  const yScale = (value) => height - padding.bottom - ((value - min) / Math.max(max - min, 1)) * (height - padding.top - padding.bottom);
+  const toLine = (values) => values.map((value, index) => `${index === 0 ? "M" : "L"}${xScale(index)},${yScale(value)}`).join(" ");
+
+  return `
+    <svg class="chart-svg dual-line-chart" viewBox="0 0 ${width} ${height}" preserveAspectRatio="none" role="img" aria-label="${escapeHtml(title)}">
+      <title>${escapeHtml(title)}</title>
+      ${[0, 1, 2, 3].map((item) => {
+        const y = padding.top + item * ((height - padding.top - padding.bottom) / 3);
+        return `<line class="chart-axis" x1="${padding.left}" y1="${y}" x2="${width - padding.right}" y2="${y}" />`;
+      }).join("")}
+      <path class="line-path" d="${toLine(primary)}" />
+      <path class="line-path secondary" d="${toLine(secondary)}" />
+      ${primary.map((value, index) => `
+        <circle class="chart-dot" cx="${xScale(index)}" cy="${yScale(value)}" r="4" />
+        <text class="chart-label" x="${xScale(index)}" y="${height - 13}" text-anchor="middle">${escapeHtml(labels[index] || "")}</text>
+      `).join("")}
+      ${secondary.map((value, index) => `<circle class="chart-dot secondary" cx="${xScale(index)}" cy="${yScale(value)}" r="4" />`).join("")}
+    </svg>
+  `;
+}
+
+function renderValueCaptureMix(project) {
+  const revenue = Number(project.thirtyDay?.revenue) || 0;
+  const returned = Math.min(Number(project.thirtyDay?.buyback) || 0, revenue);
+  const staking = Math.min(Number(project.thirtyDay?.stakingDistribution) || 0, Math.max(revenue - returned, 0));
+  const retained = Math.max(revenue - returned - staking, 0);
+  const segments = [
+    { label: "토큰 환원", value: returned, type: "return" },
+    { label: "스테이킹 분배", value: staking, type: "staking" },
+    { label: "잔여/금고", value: retained, type: "retained" },
+  ].filter((item) => item.value > 0 || item.type === "return");
+  const total = Math.max(revenue, 1);
+
+  return `
+    <div class="mix-bar" aria-label="30일 매출 가치 연결 구성">
+      ${segments.map((item) => `<span class="${item.type}" style="--w:${percentWidth(item.value, total, item.value ? 3 : 0)}%" title="${escapeHtml(item.label)} ${formatCurrency(item.value)}"></span>`).join("")}
+    </div>
+    <div class="mix-legend">
+      ${segments.map((item) => `
+        <div>
+          <i class="${item.type}"></i>
+          <span>${escapeHtml(item.label)}</span>
+          <strong>${formatPercent(item.value / total)}</strong>
+        </div>
+      `).join("")}
+    </div>
+  `;
+}
+
+function renderVisualValueFlow(project) {
+  return `
+    <div class="value-flow">
+      ${(project.valueFlow || []).map((step, index, steps) => `
+        <div class="flow-node">
+          <span>${String(index + 1).padStart(2, "0")}</span>
+          <strong>${escapeHtml(step)}</strong>
+        </div>
+        ${index < steps.length - 1 ? `<b aria-hidden="true">→</b>` : ""}
+      `).join("")}
+    </div>
+  `;
+}
+
+function renderUsagePanel(project) {
+  const usage = project.usage || {};
+  const growth = getTrend(usage.userGrowth6m || []);
+  return `
+    <div class="usage-panel">
+      <div class="usage-spark">
+        ${renderSparkline(usage.userGrowth6m || [], `${project.name} 6개월 실사용 성장`)}
+        <span class="mini-change ${growth >= 0 ? "positive" : "negative"}">${growth >= 0 ? "+" : ""}${formatPercent(growth)}</span>
+      </div>
+      <div class="usage-stats">
+        ${[
+          ["DAU", formatNumber(usage.dau), "일간 활성"],
+          ["WAU", formatNumber(usage.wau), "주간 활성"],
+          ["MAU", formatNumber(usage.mau), "월간 활성"],
+          ["신규 지갑", formatNumber(usage.newWallets), "30일"],
+          ["거래량 변화", formatPercent(usage.volumeChange30d), "30일"],
+          ["TVL 변화", formatPercent(usage.tvlChange30d), "30일"],
+        ].map(([label, value, sub]) => `
+          <div>
+            <span>${escapeHtml(label)}</span>
+            <strong>${escapeHtml(value)}</strong>
+            <small>${escapeHtml(sub)}</small>
+          </div>
+        `).join("")}
+      </div>
+    </div>
+  `;
+}
+
+function renderPeerBars(project) {
+  const categoryPeers = projects.filter((item) => item.category === project.category);
+  const basePeers = categoryPeers.length >= 3 ? categoryPeers : projects;
+  const peers = [...new Map([project, ...basePeers.sort((a, b) => (b.thirtyDay?.revenue || 0) - (a.thirtyDay?.revenue || 0))].map((item) => [item.id, item])).values()].slice(0, 6);
+  const maxRevenue = Math.max(...peers.map((item) => item.thirtyDay?.revenue || 0), 1);
+
+  return `
+    <div class="peer-bars">
+      ${peers.map((item) => `
+        <div class="peer-row${item.id === project.id ? " active" : ""}">
+          <div>
+            <strong>${escapeHtml(item.name)}</strong>
+            <span>${formatPercent(getBuybackYield(item))} 환원 수익률</span>
+          </div>
+          <i style="--w:${percentWidth(item.thirtyDay?.revenue, maxRevenue)}%"></i>
+          <b>${formatCurrency(item.thirtyDay?.revenue)}</b>
+        </div>
+      `).join("")}
+    </div>
+  `;
+}
+
+function renderUnlockTimeline(project) {
+  const unlocks = project.unlocks || {};
+  const rows = [
+    ["30일", unlocks.next30dUsd || 0],
+    ["90일", unlocks.next90dUsd || 0],
+    ["180일", unlocks.next180dUsd || 0],
+  ];
+  const max = Math.max(...rows.map(([, value]) => value), 1);
+  return `
+    <div class="timeline-list">
+      <div class="timeline-meta">
+        <span>다음 언락</span>
+        <strong>${escapeHtml(unlocks.nextDate || "-")}</strong>
+        <b>${formatCurrency(unlocks.nextAmountUsd)}</b>
+      </div>
+      ${rows.map(([label, value]) => `
+        <div class="timeline-row">
+          <span>${escapeHtml(label)}</span>
+          <i style="--w:${percentWidth(value, max)}%"></i>
+          <strong>${formatCurrency(value)}</strong>
+        </div>
+      `).join("")}
+    </div>
+  `;
+}
+
+function renderAllocationStack(project) {
+  const allocation = project.unlocks?.allocation || {};
+  const items = [
+    ["팀", allocation.team || 0, "team"],
+    ["VC", allocation.vc || 0, "vc"],
+    ["재단", allocation.foundation || 0, "foundation"],
+    ["커뮤니티", allocation.community || 0, "community"],
+  ];
+  return `
+    <div class="allocation-stack" aria-label="토큰 분배 구조">
+      ${items.map(([label, value, type]) => `<span class="${type}" style="--w:${Math.max(0, Number(value) * 100)}%" title="${escapeHtml(label)} ${formatPercent(value, 0)}"></span>`).join("")}
+    </div>
+    <div class="allocation-legend">
+      ${items.map(([label, value, type]) => `
+        <div>
+          <i class="${type}"></i>
+          <span>${escapeHtml(label)}</span>
+          <strong>${formatPercent(value, 0)}</strong>
+        </div>
+      `).join("")}
+    </div>
+  `;
+}
+
+function renderRiskChecklist(project) {
+  const risk = project.riskProfile || {};
+  const rows = [
+    ["감사", risk.audited ? "완료" : "미확인", risk.audited ? "positive" : "warning", (risk.auditors || []).join(", ") || "-"],
+    ["GitHub", risk.githubActive ? "활동 있음" : "제한적", risk.githubActive ? "positive" : "warning", risk.recentCommitDate || "공개 저장소 확인 필요"],
+    ["거버넌스", risk.governance ? "존재" : "제한적", risk.governance ? "positive" : "warning", `재단 지갑 ${risk.foundationWalletPublic ? "공개" : "비공개"}`],
+    ["팀/VC 비중", (risk.teamVcShare || 0) >= 0.5 ? "높음" : "보통", (risk.teamVcShare || 0) >= 0.5 ? "negative" : "warning", formatPercent(risk.teamVcShare || 0)],
+    ["환원 데이터", project.buybackType === "estimated" ? "추정" : "공개/실측", project.buybackType === "estimated" ? "warning" : "positive", buybackTypeLabel(project.buybackType)],
+    ["데이터 신뢰도", project.dataConfidence, project.dataConfidence === "high" ? "positive" : project.dataConfidence === "medium" ? "warning" : "negative", project.buybackSource || "-"],
+  ];
+
+  return `
+    <div class="risk-check-wrap">
+      <table class="risk-check-table">
+        <tbody>
+          ${rows.map(([label, status, type, note]) => `
+            <tr>
+              <th>${escapeHtml(label)}</th>
+              <td><span class="pill ${type}">${escapeHtml(status)}</span></td>
+              <td>${escapeHtml(note)}</td>
+            </tr>
+          `).join("")}
+        </tbody>
+      </table>
+    </div>
+    <div class="risk-badges compact">
+      ${(risk.badges || []).map((badge) => renderBadge(badge, "warning")).join("")}
+    </div>
+  `;
+}
+
+function renderLegacyFundamentalSections(project) {
   const revenueTrend = getTrendLabel(project.monthlyRevenue);
   const buybackTrend = getTrendLabel(project.monthlyBuyback);
   const usageTrend = getUsageTrendLabel(project.usage?.usageTrend);
@@ -678,7 +914,7 @@ function renderFundamentalSections(project) {
           { label: "스테이커 분배", value: formatCurrency(project.thirtyDay.stakingDistribution), sub: "30일" },
           { label: "토큰 환원 비율", value: formatPercent(getRevenueReturnRatio(project)), sub: `${formatCurrency(tokenReturnAmount)} / 매출` },
           { label: "연환산 바이백", value: formatCurrency(annualizedBuyback), sub: "buyback30d × 12" },
-          { label: "바이백 수익률", value: formatPercent(getBuybackYield(project)), sub: "연환산 / 시총" },
+          { label: "환원 수익률", value: formatPercent(getBuybackYield(project)), sub: "연환산 / 시총" },
           { label: "6개월 예상", value: formatCurrency(getProjection(project).baseUsd), sub: `${buybackTrend.label} 추세 반영` },
         ])}
       </div>
@@ -758,6 +994,144 @@ function renderFundamentalSections(project) {
       </div>
       <ul class="detail-list">
         ${(risk.notes || project.risks || []).map((item) => `<li>${escapeHtml(item)}</li>`).join("")}
+      </ul>
+    </article>
+  `;
+}
+
+function renderFundamentalSections(project) {
+  const revenueTrend = getTrendLabel(project.monthlyRevenue);
+  const buybackTrend = getTrendLabel(project.monthlyBuyback);
+  const usageTrend = getUsageTrendLabel(project.usage?.usageTrend);
+  const unlockRisk = getUnlockRisk(project);
+  const valuation = getValuation(project);
+  const annualizedBuyback = getAnnualizedBuyback(project);
+  const tokenReturnAmount = getTokenReturnAmount(project);
+  const projection = getProjection(project);
+  const notes = (project.riskProfile?.notes || []).length ? project.riskProfile.notes : project.risks || [];
+
+  $("#fundamentalSections").innerHTML = `
+    <article class="panel detail-card wide visual-card">
+      <div class="panel-header">
+        <div>
+          <p class="panel-kicker">Revenue & Token Return</p>
+          <h3>수익과 환원 추세</h3>
+        </div>
+        <div class="chart-legend">
+          <span class="revenue">매출</span>
+          <span class="return">토큰 환원</span>
+        </div>
+      </div>
+      <div class="chart-wrap visual-chart">
+        ${createDualLineChart(project.monthlyRevenue, project.monthlyBuyback, months, `${project.name} 6개월 매출 및 토큰 환원 추세`)}
+      </div>
+      <div class="compact-metrics">
+        ${renderMetricCells([
+          { label: "24h / 7d / 30d 매출", value: `${formatCurrency(project.daily.revenue)} · ${formatCurrency(project.sevenDay.revenue)} · ${formatCurrency(project.thirtyDay.revenue)}`, sub: revenueTrend.label },
+          { label: "24h / 7d / 30d 토큰 환원", value: `${formatCurrency(project.daily.buyback)} · ${formatCurrency(project.sevenDay.buyback)} · ${formatCurrency(project.thirtyDay.buyback)}`, sub: buybackTrend.label },
+          { label: "30d 거래량", value: formatCurrency(project.thirtyDay.volume), sub: `TVL ${formatCurrency(project.tvl)}` },
+        ])}
+      </div>
+    </article>
+
+    <article class="panel detail-card visual-card">
+      <div class="panel-header">
+        <div>
+          <p class="panel-kicker">Value Capture Mix</p>
+          <h3>토큰 가치 연결 구성</h3>
+        </div>
+        ${renderBadge(valueCaptureLabel(project.valueCaptureType), project.valueCaptureType === "none" ? "negative" : "positive")}
+      </div>
+      ${renderValueCaptureMix(project)}
+      <div class="metric-list">
+        ${renderMetricCells([
+          { label: "Holder Revenue", value: formatCurrency(project.thirtyDay.holderRevenue), sub: "30일" },
+          { label: "30일 바이백", value: formatCurrency(project.thirtyDay.buyback), sub: buybackTypeLabel(project.buybackType) },
+          { label: "토큰 환원 비율", value: formatPercent(getRevenueReturnRatio(project)), sub: `${formatCurrency(tokenReturnAmount)} / 매출` },
+          { label: "환원 수익률", value: formatPercent(getBuybackYield(project)), sub: `${formatCurrency(annualizedBuyback)} 연환산` },
+          { label: "6개월 예상", value: formatCurrency(projection.baseUsd), sub: `${buybackTrend.label} 추세 반영` },
+        ])}
+      </div>
+    </article>
+
+    <article class="panel detail-card visual-card">
+      <div class="panel-header">
+        <div>
+          <p class="panel-kicker">Value Flow</p>
+          <h3>토큰 가치 흐름</h3>
+        </div>
+        ${renderBadge(project.buybackType === "estimated" ? "추정 포함" : "공개 데이터", project.buybackType === "estimated" ? "warning" : "positive")}
+      </div>
+      ${renderVisualValueFlow(project)}
+    </article>
+
+    <article class="panel detail-card visual-card">
+      <div class="panel-header">
+        <div>
+          <p class="panel-kicker">Usage Growth</p>
+          <h3>실사용 및 성장</h3>
+        </div>
+        ${renderBadge(usageTrend.label, usageTrend.type)}
+      </div>
+      ${renderUsagePanel(project)}
+    </article>
+
+    <article class="panel detail-card visual-card">
+      <div class="panel-header">
+        <div>
+          <p class="panel-kicker">Peer Comparison</p>
+          <h3>피어 비교</h3>
+        </div>
+        ${renderBadge(project.category, "muted")}
+      </div>
+      ${renderPeerBars(project)}
+    </article>
+
+    <article class="panel detail-card visual-card">
+      <div class="panel-header">
+        <div>
+          <p class="panel-kicker">Unlock Timeline</p>
+          <h3>언락 일정</h3>
+        </div>
+        ${renderBadge(unlockRisk.label, unlockRisk.type)}
+      </div>
+      ${renderUnlockTimeline(project)}
+      <div class="compact-metrics single">
+        ${renderMetricCells([
+          { label: "거래량 대비 압력", value: `${getUnlockPressureRatio(project).toFixed(2)}일치`, sub: "다음 언락 / 30d 평균 거래량" },
+          { label: "FDV / MCAP", value: formatRatio((project.fdv || 0) / (project.marketCap || 1)), sub: "희석 부담" },
+        ])}
+      </div>
+    </article>
+
+    <article class="panel detail-card visual-card">
+      <div class="panel-header">
+        <div>
+          <p class="panel-kicker">Token Allocation</p>
+          <h3>토큰 분배 구조</h3>
+        </div>
+        ${renderBadge(`${formatPercent(project.circulatingSupplyPercent, 0)} 유통`, "muted")}
+      </div>
+      ${renderAllocationStack(project)}
+      <div class="compact-metrics single">
+        ${renderMetricCells([
+          { label: "시가총액", value: formatCurrency(project.marketCap), sub: "MCAP" },
+          { label: "FDV", value: formatCurrency(project.fdv), sub: `FDV/Revenue ${formatRatio(valuation.fdvToRevenue)}` },
+        ])}
+      </div>
+    </article>
+
+    <article class="panel detail-card wide visual-card">
+      <div class="panel-header">
+        <div>
+          <p class="panel-kicker">Risk Checklist</p>
+          <h3>리스크 체크</h3>
+        </div>
+        ${renderBadge(project.dataConfidence, project.dataConfidence === "high" ? "positive" : project.dataConfidence === "medium" ? "warning" : "negative")}
+      </div>
+      ${renderRiskChecklist(project)}
+      <ul class="detail-list">
+        ${notes.map((item) => `<li>${escapeHtml(item)}</li>`).join("")}
       </ul>
     </article>
   `;
@@ -887,10 +1261,10 @@ function renderInsight(project) {
   $("#scoreValue").textContent = score;
   $("#verdictBox").innerHTML = `
     <strong>${escapeHtml(signal.signal)}</strong>
-    <p>${score >= 80 ? "수익과 토큰 매입 연결성이 강합니다. 거래량이 유지될 경우 토큰 수급에 의미 있는 매수압을 만들 수 있습니다." : score >= 55 ? "수익성은 확인되지만 실제 체결 여부와 토큰 매입 강도는 추가 검증이 필요합니다." : "프로젝트 수익과 토큰 매수압의 직접 연결성이 낮거나 추정 비중이 높습니다."}</p>
+    <p>${score >= 80 ? "수익과 토큰 환원 연결성이 강합니다. 거래량이 유지될 경우 토큰 수급에 의미 있는 효과를 만들 수 있습니다." : score >= 55 ? "수익성은 확인되지만 실제 환원 집행과 언락 부담은 함께 확인해야 합니다." : "프로젝트 수익과 토큰 수급의 직접 연결성이 낮거나 추정 비중이 높습니다."}</p>
   `;
   $("#projectedUsd").textContent = formatCurrency(projection.baseUsd);
-  $("#projectedToken").textContent = `예상 매입 수량: ${formatNumber(projection.baseToken, 0)} ${project.token} · 예상 평균가 ${formatCurrency(projection.expectedAverageTokenPrice, false)}`;
+  $("#projectedToken").textContent = `예상 환원 수량: ${formatNumber(projection.baseToken, 0)} ${project.token} · 예상 평균가 ${formatCurrency(projection.expectedAverageTokenPrice, false)}`;
 
   $("#scenarioList").innerHTML = [
     { name: "보수적", value: projection.conservativeUsd },
@@ -999,7 +1373,10 @@ function initEvents() {
   $$(".tab").forEach((tab) => {
     tab.addEventListener("click", () => {
       state.activeTab = tab.dataset.tab;
+      if (state.activeTab !== "home") state.activeSummaryRank = null;
       renderTabs();
+      renderSummaryRankPanel();
+      renderSummaryCards();
     });
   });
 

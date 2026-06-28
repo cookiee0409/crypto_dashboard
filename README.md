@@ -17,7 +17,7 @@ python -m http.server 4173
 - `lib/defillama.js`: DefiLlama fees/revenue/buyback summary API 연동
 - `lib/hyperliquid.js`: Hyperliquid info API 연동
 - `src/data/projects.js`: 프로젝트 mock data 및 추후 API 매핑 대상 데이터 구조
-- `src/utils/calculations.js`: 매수압 점수, 바이백 수익률, 언락 압력, 밸류에이션 계산
+- `src/utils/calculations.js`: 토큰 수급 점수, 환원 수익률, 언락 압력, 밸류에이션 계산
 - `app.js`: 데이터 병합, 렌더링, CSV 내보내기, 설정 저장
 
 ## 포함 기능
@@ -26,10 +26,10 @@ python -m http.server 4173
 - DefiLlama protocol slug 기반 공개 수익 데이터 갱신
 - Hyperliquid Assistance Fund 주소와 DefiLlama Token Buy Back / Holder Net Income 지표 연동
 - 프로젝트 수익성, 토큰 가치 연결, 언락 및 매도 압력, 실사용 성장, 신뢰도/리스크 섹션
-- FDV/Revenue, MCAP/Holder Revenue, FDV/TVL, 바이백 수익률, 언락 위험도 자동 계산
-- 매출, 바이백, 바이백 수익률, FDV/Revenue, 언락 위험도, TVL 기준 비교 테이블 정렬
+- FDV/Revenue, MCAP/Holder Revenue, FDV/TVL, 환원 수익률, 언락 위험도 자동 계산
+- 매출, 바이백, 환원 수익률, FDV/Revenue, 언락 위험도, TVL 기준 비교 테이블 정렬
 - 실제/추정 바이백 구분 및 txHash 포함 CSV 내보내기
-- 요청서 기준 매수압 점수 산식 반영
+- 요청서 기준 토큰 수급 점수 산식 반영
 - 상시 투자 조언 아님 면책 문구 표시
 
 ## 주의

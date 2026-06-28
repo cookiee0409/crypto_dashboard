@@ -88,7 +88,7 @@
                 <div>
                   <div class="title-row">
                     <h2 id="projectTitle">Hyperliquid</h2>
-                    <span class="pill positive" id="projectSignal">강한 매수압</span>
+                    <span class="pill positive" id="projectSignal">수급 효과 강함</span>
                   </div>
                   <p class="project-description" id="projectDescription"></p>
                   <div class="source-links" id="projectSourceLinks"></div>
@@ -102,7 +102,7 @@
               <div class="metric-strip" id="projectMetrics"></div>
             </div>
 
-            <div class="chart-grid">
+            <div class="chart-grid hidden">
               <article class="panel chart-card">
                 <div class="panel-header">
                   <div>
@@ -117,8 +117,8 @@
               <article class="panel chart-card">
                 <div class="panel-header">
                   <div>
-                    <p class="panel-kicker">Buyback Pressure</p>
-                    <h3>6개월 바이백 추세</h3>
+                    <p class="panel-kicker">Token Return Flow</p>
+                    <h3>6개월 토큰 환원 추세</h3>
                   </div>
                   <span class="mini-change positive" id="buybackTrendLabel">+0%</span>
                 </div>
@@ -132,7 +132,7 @@
               <div class="panel-header">
                 <div>
                   <p class="panel-kicker">Recent Events</p>
-                  <h3>최근 바이백 내역</h3>
+                  <h3>최근 토큰 환원 내역</h3>
                 </div>
                 <button class="ghost-button small" id="exportCsvButton" type="button">CSV 내보내기</button>
               </div>
@@ -142,7 +142,7 @@
                     <tr>
                       <th>날짜</th>
                       <th>프로젝트</th>
-                      <th>매입 토큰</th>
+                      <th>환원 토큰</th>
                       <th>금액</th>
                       <th>평균가</th>
                       <th>Tx Hash</th>
@@ -158,12 +158,12 @@
           <aside class="panel insight-panel">
             <div class="panel-header compact">
               <div>
-                <p class="panel-kicker">AI Signal</p>
-                <h2>매수압 점수</h2>
+                <p class="panel-kicker">종합 진단</p>
+                <h2>토큰 수급 점수</h2>
               </div>
             </div>
 
-            <div class="score-ring" id="scoreRing" role="meter" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0" aria-label="매수압 점수">
+            <div class="score-ring" id="scoreRing" role="meter" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0" aria-label="토큰 수급 점수">
               <div>
                 <strong id="scoreValue">0</strong>
                 <span>/100</span>
@@ -173,7 +173,7 @@
             <div class="verdict" id="verdictBox"></div>
 
             <div class="projection-box">
-              <p class="panel-kicker">6개월 예상 매입</p>
+              <p class="panel-kicker">6개월 예상 환원</p>
               <h3 id="projectedUsd">-</h3>
               <p id="projectedToken">-</p>
             </div>
@@ -192,14 +192,14 @@
             <div class="panel-header">
               <div>
                 <p class="panel-kicker">Project Comparison</p>
-                <h3>프로젝트별 수익·매수압 비교</h3>
+                <h3>프로젝트별 수익·토큰 수급 비교</h3>
               </div>
               <label class="sort-control">
                 정렬
                 <select id="compareSort">
                   <option value="revenue">매출 높은 순</option>
                   <option value="buyback">바이백 높은 순</option>
-                  <option value="buybackYield">바이백 수익률 높은 순</option>
+                  <option value="buybackYield">환원 수익률 높은 순</option>
                   <option value="fdvRevenue">FDV/Revenue 낮은 순</option>
                   <option value="unlockRisk">언락 위험도 높은 순</option>
                   <option value="tvl">TVL 높은 순</option>
@@ -275,7 +275,7 @@
       </main>
 
       <footer class="site-disclaimer">
-        본 대시보드는 공개 데이터 기반의 분석 도구이며 투자 조언이 아닙니다. 표시된 수익, 바이백, 예상 매입액, 매수압 점수는 데이터 지연·누락·추정 로직에 따라 실제 값과 다를 수 있으며, 모든 투자 판단과 책임은 사용자 본인에게 있습니다.
+        본 대시보드는 공개 데이터 기반의 분석 도구이며 투자 조언이 아닙니다. 표시된 수익, 바이백, 예상 환원액, 토큰 수급 점수는 데이터 지연·누락·추정 로직에 따라 실제 값과 다를 수 있으며, 모든 투자 판단과 책임은 사용자 본인에게 있습니다.
       </footer>
     </div>
 
