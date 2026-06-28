@@ -1,151 +1,29 @@
 import { fetchDefiLlamaBuybackSummary, fetchDefiLlamaFeesSummary, fetchDefiLlamaRevenueSummary } from "./lib/defillama.js";
-import { HYPERLIQUID_ASSISTANCE_FUND, fetchHyperliquidAssistanceFundData } from "./lib/hyperliquid.js";
-import { getBuybackIntensity, getProjectScore, getProjection, getSignalFromScore, getTrend } from "./lib/calculations.js";
-
-const projects = [
-  {
-    id: "hyperliquid",
-    name: "Hyperliquid",
-    token: "HYPE",
-    category: "Perp DEX",
-    defillamaSlug: "hyperliquid",
-    defillamaBuybackSlug: "hyperliquid",
-    assistanceFundAddress: HYPERLIQUID_ASSISTANCE_FUND,
-    dataConfidence: "high",
-    buybackType: "actual_disclosed",
-    buybackSource: "DefiLlama Token Buy Back / Holder Net Income",
-    description: "Perp와 spot 거래 수수료가 Assistance Fund 시스템 주소로 귀속되고, 공개 집계상 Token Buy Back / Token Holder Net Income으로 잡히는 대표 사례입니다. 해당 주소의 HYPE는 재단 공지 기준 소각으로 간주합니다.",
-    lastUpdated: "2026-06-27 15:30 KST · 샘플",
-    price: 39.42,
-    expectedAverageTokenPrice: 42.0,
-    marketCap: 13200000000,
-    revenueToBuybackRatio: 0.92,
-    daily: { volume: 9130000000, fees: 2950000, revenue: 2140000, buyback: 1968000 },
-    sevenDay: { volume: 59200000000, fees: 19700000, revenue: 14200000, buyback: 13064000 },
-    thirtyDay: { volume: 244000000000, fees: 82100000, revenue: 61550000, buyback: 56626000 },
-    monthlyRevenue: [38.4, 41.7, 47.8, 52.5, 58.2, 61.55],
-    monthlyBuyback: [34.6, 37.2, 42.9, 47.6, 53.1, 56.63],
-    monthlyVolume: [181, 194, 210, 226, 238, 244],
-    cumulativeBuybackUsd: 1182320040,
-    assistanceFundHype: 44690000,
-    sourceLinks: [
-      { label: "Hyperliquid Docs", url: "https://hyperliquid.gitbook.io/hyperliquid-docs/trading/fees" },
-      { label: "Foundation Notice", url: "https://x.com/HyperFND/status/2001127850754367525" },
-      { label: "Hypurrscan", url: "https://hypurrscan.io/address/0xfefefefefefefefefefefefefefefefefefefefe" },
-      { label: "DefiLlama", url: "https://defillama.com/protocol/hyperliquid" },
-      { label: "HYPE Burns", url: "https://www.buildix.trade/hype-burns" },
-    ],
-    buybackEvents: [
-      { date: "2026-06-27", txHash: "sample-hype-20260627", tokenAmount: 49924, usd: 1968000, price: 39.42, source: "sample Assistance Fund", buybackType: "actual_disclosed" },
-      { date: "2026-05-31", txHash: "sample-hype-20260531", tokenAmount: 1347032, usd: 53100000, price: 39.42, source: "sample Assistance Fund", buybackType: "actual_disclosed" },
-      { date: "2026-04-30", txHash: "sample-hype-20260430", tokenAmount: 1207519, usd: 47600000, price: 39.42, source: "sample Assistance Fund", buybackType: "actual_disclosed" },
-    ],
-    risks: ["거래량 의존도가 높아 시장 침체 시 매수압도 약해질 수 있습니다.", "바이백이 소각인지 보유인지에 따라 공급 감소 효과가 달라집니다.", "토큰 가격 상승 시 동일 금액으로 매입 가능한 수량은 감소합니다."],
-  },
-  {
-    id: "jupiter",
-    name: "Jupiter",
-    token: "JUP",
-    category: "DEX Aggregator",
-    defillamaSlug: "jupiter",
-    dataConfidence: "medium",
-    buybackType: "estimated",
-    buybackSource: "추정 모델",
-    description: "Solana 기반 거래 라우팅·perp·launch 기능을 갖춘 프로젝트입니다. 수익과 토큰 가치 연결 구조 확인이 중요합니다.",
-    lastUpdated: "2026-06-27 15:30 KST · 샘플",
-    price: 0.58,
-    expectedAverageTokenPrice: 0.62,
-    marketCap: 1850000000,
-    revenueToBuybackRatio: 0.38,
-    daily: { volume: 1280000000, fees: 840000, revenue: 410000, buyback: 155800 },
-    sevenDay: { volume: 8100000000, fees: 5470000, revenue: 2700000, buyback: 1026000 },
-    thirtyDay: { volume: 35200000000, fees: 23100000, revenue: 11200000, buyback: 4256000 },
-    monthlyRevenue: [7.8, 8.3, 9.2, 10.5, 10.1, 11.2],
-    monthlyBuyback: [2.1, 2.6, 3.2, 3.9, 3.7, 4.26],
-    monthlyVolume: [29.7, 31.8, 33.1, 34.7, 35.9, 35.2],
-    buybackEvents: [],
-    risks: ["수익이 항상 토큰 매입으로 직접 연결되는 것은 아닙니다.", "프로덕트별 수익 배분 정책 확인이 필요합니다."],
-  },
-  {
-    id: "uniswap",
-    name: "Uniswap",
-    token: "UNI",
-    category: "DEX",
-    defillamaSlug: "uniswap",
-    dataConfidence: "medium",
-    buybackType: "estimated",
-    buybackSource: "추정 모델",
-    description: "DEX 거래량과 수수료는 크지만, 수익이 UNI 토큰 매수압으로 직접 연결되는지 별도 확인해야 합니다.",
-    lastUpdated: "2026-06-27 15:30 KST · 샘플",
-    price: 8.12,
-    expectedAverageTokenPrice: 8.5,
-    marketCap: 6100000000,
-    revenueToBuybackRatio: 0.05,
-    daily: { volume: 1760000000, fees: 1730000, revenue: 180000, buyback: 9000 },
-    sevenDay: { volume: 11400000000, fees: 12100000, revenue: 1160000, buyback: 58000 },
-    thirtyDay: { volume: 46900000000, fees: 50200000, revenue: 4810000, buyback: 240500 },
-    monthlyRevenue: [4.1, 4.6, 4.9, 4.2, 5.0, 4.81],
-    monthlyBuyback: [0.18, 0.2, 0.25, 0.19, 0.27, 0.24],
-    monthlyVolume: [43.4, 45.8, 48.6, 42.1, 50.1, 46.9],
-    buybackEvents: [],
-    risks: ["프로토콜 수수료와 UNI 홀더 수익은 구분해서 봐야 합니다.", "거래량은 커도 토큰 매수압은 낮을 수 있습니다."],
-  },
-  {
-    id: "aave",
-    name: "Aave",
-    token: "AAVE",
-    category: "Lending",
-    defillamaSlug: "aave",
-    dataConfidence: "high",
-    buybackType: "estimated",
-    buybackSource: "추정 모델",
-    description: "대출·차입 시장에서 발생하는 수익성과 안전모듈, 토큰 이코노미 연결을 함께 확인해야 하는 프로젝트입니다.",
-    lastUpdated: "2026-06-27 15:30 KST · 샘플",
-    price: 286.4,
-    expectedAverageTokenPrice: 300,
-    marketCap: 4300000000,
-    tvl: 20500000000,
-    revenueToBuybackRatio: 0.24,
-    daily: { volume: null, fees: 690000, revenue: 520000, buyback: 124800 },
-    sevenDay: { volume: null, fees: 4720000, revenue: 3610000, buyback: 866400 },
-    thirtyDay: { volume: null, fees: 19400000, revenue: 14900000, buyback: 3576000 },
-    monthlyRevenue: [12.1, 13.0, 13.4, 14.1, 14.6, 14.9],
-    monthlyBuyback: [2.4, 2.8, 3.0, 3.2, 3.4, 3.58],
-    monthlyVolume: [],
-    buybackEvents: [],
-    risks: ["Lending 프로젝트는 DEX 거래량 대신 TVL, 차입 수요, 이자 수익을 봐야 합니다.", "거버넌스 결정에 따라 수익 분배 방식이 바뀔 수 있습니다."],
-  },
-  {
-    id: "aerodrome",
-    name: "Aerodrome",
-    token: "AERO",
-    category: "DEX",
-    defillamaSlug: "aerodrome",
-    dataConfidence: "medium",
-    buybackType: "estimated",
-    buybackSource: "추정 모델",
-    description: "Base 생태계의 주요 DEX입니다. 수수료, 인센티브, 락업 구조를 같이 봐야 합니다.",
-    lastUpdated: "2026-06-27 15:30 KST · 샘플",
-    price: 0.91,
-    expectedAverageTokenPrice: 0.98,
-    marketCap: 980000000,
-    revenueToBuybackRatio: 0.18,
-    daily: { volume: 420000000, fees: 590000, revenue: 330000, buyback: 59400 },
-    sevenDay: { volume: 2860000000, fees: 3920000, revenue: 2210000, buyback: 397800 },
-    thirtyDay: { volume: 12100000000, fees: 16100000, revenue: 9100000, buyback: 1638000 },
-    monthlyRevenue: [5.8, 6.4, 7.2, 8.8, 8.1, 9.1],
-    monthlyBuyback: [0.9, 1.0, 1.2, 1.5, 1.45, 1.64],
-    monthlyVolume: [9.4, 10.1, 10.7, 12.2, 11.8, 12.1],
-    buybackEvents: [],
-    risks: ["토큰 인센티브 비용을 수익과 함께 봐야 합니다.", "DEX 수익이 토큰 가격에 반영되는 경로가 복잡합니다."],
-  },
-];
+import { fetchHyperliquidAssistanceFundData } from "./lib/hyperliquid.js";
+import { projects } from "./src/data/projects.js";
+import {
+  getAnnualizedBuyback,
+  getBuybackYield,
+  getDashboardHighlights,
+  getProjectScore,
+  getProjection,
+  getRevenueReturnRatio,
+  getSignalFromScore,
+  getTokenReturnAmount,
+  getTrend,
+  getTrendLabel,
+  getUnlockPressureRatio,
+  getUnlockRisk,
+  getUsageTrendLabel,
+  getValuation,
+} from "./src/utils/calculations.js";
 
 const state = {
   selectedProjectId: "hyperliquid",
   category: "전체",
   search: "",
   activeTab: "dashboard",
+  compareSort: "revenue",
   isRefreshing: false,
   status: "샘플 데이터 표시 중 · 데이터 새로고침을 누르면 공개 API 연동을 시도합니다.",
 };
@@ -176,6 +54,34 @@ function formatNumber(value, digits = 0) {
 function formatPercent(value, digits = 1) {
   if (value === null || value === undefined || Number.isNaN(Number(value))) return "-";
   return `${(Number(value) * 100).toFixed(digits)}%`;
+}
+
+function formatRatio(value, digits = 1) {
+  if (value === null || value === undefined || Number.isNaN(Number(value))) return "-";
+  return `${Number(value).toFixed(digits)}x`;
+}
+
+function valueCaptureLabel(type) {
+  return {
+    buyback: "바이백",
+    buyback_and_burn: "바이백+소각",
+    burn: "소각",
+    staking_distribution: "스테이커 분배",
+    treasury_accumulation: "금고 축적",
+    none: "없음",
+  }[type] || "확인 필요";
+}
+
+function renderMetricCells(items) {
+  return items
+    .map((item) => `
+      <div class="metric-item">
+        <p>${escapeHtml(item.label)}</p>
+        <strong>${escapeHtml(item.value)}</strong>
+        <span>${escapeHtml(item.sub || "")}</span>
+      </div>
+    `)
+    .join("");
 }
 
 function shortHash(hash) {
@@ -296,6 +202,8 @@ async function refreshProjectData(project) {
     next.daily.buyback = buyback.dailyBuyback;
     next.sevenDay.buyback = buyback.sevenDayBuyback;
     next.thirtyDay.buyback = buyback.thirtyDayBuyback;
+    next.thirtyDay.holderRevenue = buyback.thirtyDayBuyback;
+    next.thirtyDay.burn = buyback.thirtyDayBuyback;
     next.monthlyBuyback = normalizeMonthly(buyback.monthlyBuyback, project.monthlyBuyback);
     next.cumulativeBuybackUsd = buyback.cumulativeBuyback;
     next.latestBuybackDate = buyback.latestDate;
@@ -371,15 +279,15 @@ function renderDataStatus() {
   $("#dataStatus").textContent = state.status;
 }
 
-function renderSummaryCards(project) {
-  const volume = getVolumeMetric(project, "daily");
+function renderSummaryCards() {
+  const highlights = getDashboardHighlights(projects);
   const cards = [
-    volume,
-    { label: "24h Fees", value: formatCurrency(project.daily.fees), sub: "사용자 지불 수수료" },
-    { label: "24h Revenue", value: formatCurrency(project.daily.revenue), sub: "프로토콜 귀속 수익" },
-    { label: "7d Revenue", value: formatCurrency(project.sevenDay.revenue), sub: "최근 7일 수익" },
-    { label: "24h Buyback", value: formatCurrency(project.daily.buyback), sub: buybackTypeLabel(project.buybackType) },
-    { label: "Buyback Intensity", value: formatPercent(getBuybackIntensity(project)), sub: "연환산 매입액 / 시총" },
+    { label: "30일 매출 1위", value: highlights.byRevenue?.name, sub: formatCurrency(highlights.byRevenue?.thirtyDay?.revenue) },
+    { label: "30일 바이백 1위", value: highlights.byBuyback?.name, sub: formatCurrency(highlights.byBuyback?.thirtyDay?.buyback) },
+    { label: "바이백 수익률 1위", value: highlights.byYield?.name, sub: formatPercent(getBuybackYield(highlights.byYield)) },
+    { label: "언락 위험 최고", value: highlights.byUnlock?.name, sub: `${getUnlockRisk(highlights.byUnlock).label} · ${getUnlockPressureRatio(highlights.byUnlock).toFixed(2)}일치` },
+    { label: "FDV/Revenue 저평가", value: highlights.byCheap?.name, sub: formatRatio(getValuation(highlights.byCheap).fdvToRevenue) },
+    { label: "실사용 성장 1위", value: highlights.byUsage?.name, sub: getTrendLabel(highlights.byUsage?.usage?.userGrowth6m || []).label },
   ];
 
   $("#summaryCards").innerHTML = cards
@@ -476,6 +384,173 @@ function renderProjectHero(project) {
       </div>
     `)
     .join("");
+}
+
+function renderBadge(label, type = "muted") {
+  return `<span class="pill ${type}">${escapeHtml(label)}</span>`;
+}
+
+function renderValueFlow(project) {
+  return `
+    <div class="flow-row">
+      ${(project.valueFlow || []).map((step) => `<span>${escapeHtml(step)}</span>`).join("<b>→</b>")}
+    </div>
+  `;
+}
+
+function renderAllocation(allocation = {}) {
+  const items = [
+    ["팀", allocation.team],
+    ["VC", allocation.vc],
+    ["재단", allocation.foundation],
+    ["커뮤니티", allocation.community],
+  ];
+  return `
+    <div class="allocation-bars">
+      ${items.map(([label, value]) => `
+        <div>
+          <span>${escapeHtml(label)}</span>
+          <strong>${formatPercent(value || 0, 0)}</strong>
+          <i style="--w:${Math.max(2, Number(value || 0) * 100)}%"></i>
+        </div>
+      `).join("")}
+    </div>
+  `;
+}
+
+function renderFundamentalSections(project) {
+  const revenueTrend = getTrendLabel(project.monthlyRevenue);
+  const buybackTrend = getTrendLabel(project.monthlyBuyback);
+  const usageTrend = getUsageTrendLabel(project.usage?.usageTrend);
+  const unlockRisk = getUnlockRisk(project);
+  const valuation = getValuation(project);
+  const annualizedBuyback = getAnnualizedBuyback(project);
+  const tokenReturnAmount = getTokenReturnAmount(project);
+  const risk = project.riskProfile || {};
+
+  $("#fundamentalSections").innerHTML = `
+    <article class="panel detail-card">
+      <div class="panel-header">
+        <div>
+          <p class="panel-kicker">Profitability</p>
+          <h3>프로젝트 수익성</h3>
+        </div>
+        ${renderBadge(revenueTrend.label, revenueTrend.type)}
+      </div>
+      <div class="detail-metrics">
+        ${renderMetricCells([
+          { label: "24h 거래량", value: formatCurrency(project.daily.volume), sub: "최근 하루" },
+          { label: "7d 거래량", value: formatCurrency(project.sevenDay.volume), sub: "최근 7일" },
+          { label: "30d 거래량", value: formatCurrency(project.thirtyDay.volume), sub: "최근 30일" },
+          { label: "24h 수수료", value: formatCurrency(project.daily.fees), sub: "User fees" },
+          { label: "7d 수수료", value: formatCurrency(project.sevenDay.fees), sub: "누적 수수료" },
+          { label: "30d 수수료", value: formatCurrency(project.thirtyDay.fees), sub: "누적 수수료" },
+          { label: "프로토콜 매출", value: formatCurrency(project.thirtyDay.revenue), sub: "30일 기준" },
+          { label: "실질 수익", value: formatCurrency(project.thirtyDay.earnings), sub: "mock earnings" },
+          { label: "TVL", value: formatCurrency(project.tvl), sub: "예치/운용 규모" },
+        ])}
+      </div>
+    </article>
+
+    <article class="panel detail-card">
+      <div class="panel-header">
+        <div>
+          <p class="panel-kicker">Token Value Capture</p>
+          <h3>토큰 가치 연결</h3>
+        </div>
+        ${renderBadge(valueCaptureLabel(project.valueCaptureType), project.valueCaptureType === "none" ? "negative" : "positive")}
+      </div>
+      <div class="detail-metrics">
+        ${renderMetricCells([
+          { label: "Holder Revenue", value: formatCurrency(project.thirtyDay.holderRevenue), sub: "30일" },
+          { label: "30일 바이백", value: formatCurrency(project.thirtyDay.buyback), sub: buybackTypeLabel(project.buybackType) },
+          { label: "소각 금액", value: formatCurrency(project.thirtyDay.burn), sub: "30일" },
+          { label: "스테이커 분배", value: formatCurrency(project.thirtyDay.stakingDistribution), sub: "30일" },
+          { label: "토큰 환원 비율", value: formatPercent(getRevenueReturnRatio(project)), sub: `${formatCurrency(tokenReturnAmount)} / 매출` },
+          { label: "연환산 바이백", value: formatCurrency(annualizedBuyback), sub: "buyback30d × 12" },
+          { label: "바이백 수익률", value: formatPercent(getBuybackYield(project)), sub: "연환산 / 시총" },
+          { label: "6개월 예상", value: formatCurrency(getProjection(project).baseUsd), sub: `${buybackTrend.label} 추세 반영` },
+        ])}
+      </div>
+      ${renderValueFlow(project)}
+    </article>
+
+    <article class="panel detail-card">
+      <div class="panel-header">
+        <div>
+          <p class="panel-kicker">Unlock Pressure</p>
+          <h3>언락 및 매도 압력</h3>
+        </div>
+        ${renderBadge(unlockRisk.label, unlockRisk.type)}
+      </div>
+      <div class="detail-metrics">
+        ${renderMetricCells([
+          { label: "현재 유통률", value: formatPercent(project.circulatingSupplyPercent), sub: "Circulating / Max" },
+          { label: "시가총액", value: formatCurrency(project.marketCap), sub: "MCAP" },
+          { label: "FDV", value: formatCurrency(project.fdv), sub: "Fully diluted" },
+          { label: "FDV / MCAP", value: formatRatio((project.fdv || 0) / (project.marketCap || 1)), sub: "희석 부담" },
+          { label: "다음 언락", value: formatCurrency(project.unlocks?.nextAmountUsd), sub: project.unlocks?.nextDate || "-" },
+          { label: "30일 언락", value: formatCurrency(project.unlocks?.next30dUsd), sub: "다음 30일" },
+          { label: "90일 언락", value: formatCurrency(project.unlocks?.next90dUsd), sub: "다음 90일" },
+          { label: "180일 언락", value: formatCurrency(project.unlocks?.next180dUsd), sub: "다음 180일" },
+          { label: "거래량 대비 압력", value: `${getUnlockPressureRatio(project).toFixed(2)}일치`, sub: "다음 언락 / 30d 평균 거래량" },
+        ])}
+      </div>
+      ${renderAllocation(project.unlocks?.allocation)}
+    </article>
+
+    <article class="panel detail-card">
+      <div class="panel-header">
+        <div>
+          <p class="panel-kicker">Usage Growth</p>
+          <h3>실사용 및 성장</h3>
+        </div>
+        ${renderBadge(usageTrend.label, usageTrend.type)}
+      </div>
+      <div class="detail-metrics">
+        ${renderMetricCells([
+          { label: "DAU", value: formatNumber(project.usage?.dau), sub: "일간 활성" },
+          { label: "WAU", value: formatNumber(project.usage?.wau), sub: "주간 활성" },
+          { label: "MAU", value: formatNumber(project.usage?.mau), sub: "월간 활성" },
+          { label: "활성 지갑", value: formatNumber(project.usage?.activeWallets), sub: "월간 기준" },
+          { label: "신규 지갑", value: formatNumber(project.usage?.newWallets), sub: "30일" },
+          { label: "트랜잭션", value: formatNumber(project.usage?.transactions30d), sub: "30일" },
+          { label: "TVL 변화율", value: formatPercent(project.usage?.tvlChange30d), sub: "30일" },
+          { label: "거래량 변화율", value: formatPercent(project.usage?.volumeChange30d), sub: "30일" },
+        ])}
+      </div>
+    </article>
+
+    <article class="panel detail-card wide">
+      <div class="panel-header">
+        <div>
+          <p class="panel-kicker">Trust & Risk</p>
+          <h3>신뢰도 / 리스크</h3>
+        </div>
+        ${renderBadge(project.dataConfidence, project.dataConfidence === "high" ? "positive" : project.dataConfidence === "medium" ? "warning" : "negative")}
+      </div>
+      <div class="trust-grid">
+        <div>
+          <p>공식 홈페이지</p>
+          <a href="${escapeHtml(risk.website || "#")}" target="_blank" rel="noreferrer">${escapeHtml(risk.website || "-")}</a>
+        </div>
+        <div>
+          <p>문서 링크</p>
+          <a href="${escapeHtml(risk.docs || "#")}" target="_blank" rel="noreferrer">${escapeHtml(risk.docs || "-")}</a>
+        </div>
+        <div><p>감사 여부</p><strong>${risk.audited ? "감사 완료" : "감사 없음"}</strong><span>${escapeHtml((risk.auditors || []).join(", ") || "-")}</span></div>
+        <div><p>GitHub 활동</p><strong>${risk.githubActive ? "활동 있음" : "활동 제한"}</strong><span>${escapeHtml(risk.recentCommitDate || "-")}</span></div>
+        <div><p>거버넌스</p><strong>${risk.governance ? "존재" : "제한적"}</strong><span>재단 지갑 ${risk.foundationWalletPublic ? "공개" : "비공개"}</span></div>
+        <div><p>팀/VC 물량</p><strong>${formatPercent(risk.teamVcShare || 0)}</strong><span>${escapeHtml((risk.investors || []).join(", ") || "-")}</span></div>
+      </div>
+      <div class="risk-badges">
+        ${(risk.badges || []).map((badge) => renderBadge(badge, "warning")).join("")}
+      </div>
+      <ul class="detail-list">
+        ${(risk.notes || project.risks || []).map((item) => `<li>${escapeHtml(item)}</li>`).join("")}
+      </ul>
+    </article>
+  `;
 }
 
 function createLineChart(values, labels, title) {
@@ -621,23 +696,35 @@ function renderInsight(project) {
 }
 
 function renderCompareTable() {
-  $("#compareTable").innerHTML = projects
+  const sorted = [...projects].sort((a, b) => {
+    if (state.compareSort === "buyback") return (b.thirtyDay?.buyback || 0) - (a.thirtyDay?.buyback || 0);
+    if (state.compareSort === "buybackYield") return getBuybackYield(b) - getBuybackYield(a);
+    if (state.compareSort === "fdvRevenue") return (getValuation(a).fdvToRevenue ?? Infinity) - (getValuation(b).fdvToRevenue ?? Infinity);
+    if (state.compareSort === "unlockRisk") return getUnlockRisk(b).score - getUnlockRisk(a).score || getUnlockPressureRatio(b) - getUnlockPressureRatio(a);
+    if (state.compareSort === "tvl") return (b.tvl || 0) - (a.tvl || 0);
+    return (b.thirtyDay?.revenue || 0) - (a.thirtyDay?.revenue || 0);
+  });
+
+  $("#compareTable").innerHTML = sorted
     .map((project) => {
-      const intensity = getBuybackIntensity(project);
-      const derived = applyDerivedSignal(project);
+      const valuation = getValuation(project);
+      const unlockRisk = getUnlockRisk(project);
       return `
         <tr>
-          <td>${escapeHtml(project.name)}</td>
-          <td>${escapeHtml(project.token)}</td>
+          <td>${escapeHtml(project.name)}<span class="subtext">${escapeHtml(project.token)}</span></td>
           <td>${escapeHtml(project.category)}</td>
-          <td>${formatCurrency(project.daily.revenue)}</td>
-          <td>${formatCurrency(project.sevenDay.revenue)}</td>
+          <td>${formatCurrency(project.marketCap)}</td>
+          <td>${formatCurrency(project.fdv)}</td>
           <td>${formatCurrency(project.thirtyDay.revenue)}</td>
+          <td>${formatCurrency(project.thirtyDay.holderRevenue)}</td>
           <td>${formatCurrency(project.thirtyDay.buyback)}</td>
-          <td>${formatPercent(project.revenueToBuybackRatio)}</td>
-          <td>${formatPercent(intensity)}</td>
-          <td><span class="pill ${project.dataConfidence === "high" ? "positive" : "warning"}">${escapeHtml(project.dataConfidence)}</span></td>
-          <td><span class="pill ${derived.signalType}">${escapeHtml(derived.signal)} · ${derived.score}</span></td>
+          <td>${formatRatio(valuation.fdvToRevenue)}</td>
+          <td>${formatRatio(valuation.mcapToHolderRevenue)}</td>
+          <td>${formatCurrency(project.tvl)}</td>
+          <td>${formatRatio(valuation.fdvToTvl)}</td>
+          <td>${formatCurrency(project.unlocks?.next90dUsd)}</td>
+          <td>${renderBadge(unlockRisk.label, unlockRisk.type)}</td>
+          <td>${escapeHtml(valueCaptureLabel(project.valueCaptureType))}</td>
         </tr>
       `;
     })
@@ -680,11 +767,12 @@ function exportCsv(project) {
 function render() {
   const selectedProject = getSelectedProject();
   renderDataStatus();
-  renderSummaryCards(selectedProject);
+  renderSummaryCards();
   renderCategoryFilter();
   renderProjectList();
   renderProjectHero(selectedProject);
   renderCharts(selectedProject);
+  renderFundamentalSections(selectedProject);
   renderBuybackTable(selectedProject);
   renderInsight(selectedProject);
   renderCompareTable();
@@ -692,6 +780,7 @@ function render() {
   syncSettingsForm(selectedProject);
   $("#refreshButton").textContent = state.isRefreshing ? "갱신 중..." : "데이터 새로고침";
   $("#refreshButton").disabled = state.isRefreshing;
+  if ($("#compareSort")) $("#compareSort").value = state.compareSort;
 }
 
 function initEvents() {
@@ -710,6 +799,10 @@ function initEvents() {
   $("#refreshButton").addEventListener("click", refreshSelectedProject);
   $("#saveSettingsButton").addEventListener("click", saveSettings);
   $("#exportCsvButton").addEventListener("click", () => exportCsv(getSelectedProject()));
+  $("#compareSort").addEventListener("change", (event) => {
+    state.compareSort = event.target.value;
+    renderCompareTable();
+  });
 }
 
 initEvents();

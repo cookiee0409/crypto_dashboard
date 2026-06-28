@@ -90,6 +90,8 @@
               </article>
             </div>
 
+            <div class="fundamental-grid" id="fundamentalSections"></div>
+
             <article class="panel table-card">
               <div class="panel-header">
                 <div>
@@ -156,22 +158,36 @@
                 <p class="panel-kicker">Project Comparison</p>
                 <h3>프로젝트별 수익·매수압 비교</h3>
               </div>
+              <label class="sort-control">
+                정렬
+                <select id="compareSort">
+                  <option value="revenue">매출 높은 순</option>
+                  <option value="buyback">바이백 높은 순</option>
+                  <option value="buybackYield">바이백 수익률 높은 순</option>
+                  <option value="fdvRevenue">FDV/Revenue 낮은 순</option>
+                  <option value="unlockRisk">언락 위험도 높은 순</option>
+                  <option value="tvl">TVL 높은 순</option>
+                </select>
+              </label>
             </div>
             <div class="table-scroll">
               <table>
                 <thead>
                   <tr>
                     <th>프로젝트</th>
-                    <th>Token</th>
                     <th>카테고리</th>
-                    <th>24h 수익</th>
-                    <th>7d 수익</th>
+                    <th>시가총액</th>
+                    <th>FDV</th>
                     <th>30d 수익</th>
+                    <th>30d Holder Revenue</th>
                     <th>30d 바이백</th>
-                    <th>바이백/수익</th>
-                    <th>연환산 강도</th>
-                    <th>신뢰도</th>
-                    <th>시그널</th>
+                    <th>FDV/Revenue</th>
+                    <th>MCAP/Holder Rev</th>
+                    <th>TVL</th>
+                    <th>FDV/TVL</th>
+                    <th>90일 언락</th>
+                    <th>언락 위험</th>
+                    <th>환원 방식</th>
                   </tr>
                 </thead>
                 <tbody id="compareTable"></tbody>
