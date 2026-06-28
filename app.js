@@ -1,5 +1,5 @@
 import { fetchDefiLlamaFeesSummary, fetchDefiLlamaRevenueSummary } from "./lib/defillama.js";
-import { fetchHyperliquidUserFills } from "./lib/hyperliquid.js";
+import { HYPERLIQUID_ASSISTANCE_FUND, fetchHyperliquidAssistanceFundData } from "./lib/hyperliquid.js";
 import { getBuybackIntensity, getProjectScore, getProjection, getSignalFromScore, getTrend } from "./lib/calculations.js";
 
 const projects = [
@@ -9,10 +9,10 @@ const projects = [
     token: "HYPE",
     category: "Perp DEX",
     defillamaSlug: "hyperliquid-perps",
-    assistanceFundAddress: "",
+    assistanceFundAddress: HYPERLIQUID_ASSISTANCE_FUND,
     dataConfidence: "high",
-    buybackType: "actual",
-    buybackSource: "Assistance Fund",
+    buybackType: "actual_disclosed",
+    buybackSource: "Hyperliquid public Assistance Fund",
     description: "Perp 거래량과 수수료가 프로젝트 수익으로 이어지고, Assistance Fund의 자체 토큰 매입으로 토큰 매수압을 추적하기 좋은 대표 사례입니다.",
     lastUpdated: "2026-06-27 15:30 KST · 샘플",
     price: 39.42,
@@ -26,9 +26,9 @@ const projects = [
     monthlyBuyback: [34.6, 37.2, 42.9, 47.6, 53.1, 56.63],
     monthlyVolume: [181, 194, 210, 226, 238, 244],
     buybackEvents: [
-      { date: "2026-06-27", txHash: "sample-hype-20260627", tokenAmount: 49924, usd: 1968000, price: 39.42, source: "샘플 Assistance Fund", buybackType: "actual" },
-      { date: "2026-05-31", txHash: "sample-hype-20260531", tokenAmount: 1347032, usd: 53100000, price: 39.42, source: "샘플 Assistance Fund", buybackType: "actual" },
-      { date: "2026-04-30", txHash: "sample-hype-20260430", tokenAmount: 1207519, usd: 47600000, price: 39.42, source: "샘플 Assistance Fund", buybackType: "actual" },
+      { date: "2026-06-27", txHash: "sample-hype-20260627", tokenAmount: 49924, usd: 1968000, price: 39.42, source: "sample Assistance Fund", buybackType: "actual_disclosed" },
+      { date: "2026-05-31", txHash: "sample-hype-20260531", tokenAmount: 1347032, usd: 53100000, price: 39.42, source: "sample Assistance Fund", buybackType: "actual_disclosed" },
+      { date: "2026-04-30", txHash: "sample-hype-20260430", tokenAmount: 1207519, usd: 47600000, price: 39.42, source: "sample Assistance Fund", buybackType: "actual_disclosed" },
     ],
     risks: ["거래량 의존도가 높아 시장 침체 시 매수압도 약해질 수 있습니다.", "바이백이 소각인지 보유인지에 따라 공급 감소 효과가 달라집니다.", "토큰 가격 상승 시 동일 금액으로 매입 가능한 수량은 감소합니다."],
   },
@@ -216,9 +216,36 @@ function estimateBuybacksFromRevenue(project, monthlyRevenue = project.monthlyRe
   return monthlyRevenue.map((value) => Number((value * project.revenueToBuybackRatio).toFixed(2)));
 }
 
+function isActualBuyback(project) {
+  return ["actual", "actual_onchain", "actual_disclosed"].includes(project.buybackType);
+}
+
+function buybackTypeLabel(type) {
+  if (type === "actual_onchain") return "actual fills";
+  if (type === "actual_disclosed") return "public account";
+  return "estimated model";
+}
+
 function eventsSince(events, days) {
   const cutoff = Date.now() - days * 24 * 60 * 60 * 1000;
   return events.filter((event) => Date.parse(event.date) >= cutoff);
+}
+
+function monthlyBuybacksFromEvents(events, monthsBack = 6) {
+  const now = new Date();
+  const buckets = Array.from({ length: monthsBack }, (_, index) => {
+    const month = new Date(now.getFullYear(), now.getMonth() - (monthsBack - 1 - index), 1);
+    return { key: `${month.getFullYear()}-${String(month.getMonth() + 1).padStart(2, "0")}`, usd: 0 };
+  });
+  const bucketMap = new Map(buckets.map((bucket) => [bucket.key, bucket]));
+  for (const event of events) {
+    const date = new Date(event.date);
+    if (Number.isNaN(date.getTime())) continue;
+    const key = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}`;
+    const bucket = bucketMap.get(key);
+    if (bucket) bucket.usd += Number(event.usd) || 0;
+  }
+  return buckets.map((bucket) => Number((bucket.usd / 1000000).toFixed(2)));
 }
 
 async function refreshProjectData(project) {
@@ -244,7 +271,7 @@ async function refreshProjectData(project) {
     next.sevenDay.revenue = revenue.sevenDayRevenue;
     next.thirtyDay.revenue = revenue.thirtyDayRevenue;
     next.monthlyRevenue = normalizeMonthly(revenue.monthlyRevenue, project.monthlyRevenue);
-    if (next.buybackType !== "actual") {
+    if (!isActualBuyback(next)) {
       next.monthlyBuyback = estimateBuybacksFromRevenue(next);
       next.daily.buyback = next.daily.revenue * next.revenueToBuybackRatio;
       next.sevenDay.buyback = next.sevenDay.revenue * next.revenueToBuybackRatio;
@@ -254,20 +281,31 @@ async function refreshProjectData(project) {
   }
 
   if (next.id === "hyperliquid" && isValidEvmAddress(next.assistanceFundAddress)) {
-    const fills = await fetchHyperliquidUserFills(next.assistanceFundAddress, 180);
-    const buyEvents = fills
-      .filter((fill) => fill.usd > 0 && (!fill.side || String(fill.side).toLowerCase().includes("b")))
-      .sort((a, b) => Date.parse(b.date) - Date.parse(a.date))
-      .slice(0, 25);
+    const afData = await fetchHyperliquidAssistanceFundData(next.assistanceFundAddress, 180);
+    const buyEvents = afData.events.sort((a, b) => Date.parse(b.date) - Date.parse(a.date));
+
     if (buyEvents.length) {
-      next.buybackEvents = buyEvents;
-      next.buybackType = "actual";
-      next.buybackSource = "Hyperliquid userFillsByTime";
+      next.buybackEvents = buyEvents.slice(0, 25);
+      next.buybackType = "actual_onchain";
+      next.buybackSource = "Hyperliquid Assistance Fund fills";
       next.daily.buyback = eventsSince(buyEvents, 1).reduce((sum, item) => sum + item.usd, 0);
       next.sevenDay.buyback = eventsSince(buyEvents, 7).reduce((sum, item) => sum + item.usd, 0);
       next.thirtyDay.buyback = eventsSince(buyEvents, 30).reduce((sum, item) => sum + item.usd, 0);
+      next.monthlyBuyback = monthlyBuybacksFromEvents(buyEvents);
       sources.push("Hyperliquid fills");
+    } else if (afData.hypeBalance.entryNotionalUsd > 0) {
+      next.buybackType = "actual_disclosed";
+      next.buybackSource = "Hyperliquid Assistance Fund spot state";
+      next.thirtyDay.buyback = afData.hypeBalance.entryNotionalUsd;
+      next.monthlyBuyback = [
+        ...next.monthlyBuyback.slice(0, -1),
+        Number((afData.hypeBalance.entryNotionalUsd / 1000000).toFixed(2)),
+      ];
+      sources.push("Hyperliquid spot state");
     }
+
+    if (afData.accountValueUsd > 0) next.assistanceFundValueUsd = afData.accountValueUsd;
+    if (afData.hypeBalance.amount > 0) next.assistanceFundHype = afData.hypeBalance.amount;
   }
 
   if (!sources.length) throw new Error("공개 API에서 갱신 가능한 데이터를 받지 못했습니다.");
@@ -314,7 +352,7 @@ function renderSummaryCards(project) {
     { label: "24h Fees", value: formatCurrency(project.daily.fees), sub: "사용자 지불 수수료" },
     { label: "24h Revenue", value: formatCurrency(project.daily.revenue), sub: "프로토콜 귀속 수익" },
     { label: "7d Revenue", value: formatCurrency(project.sevenDay.revenue), sub: "최근 7일 수익" },
-    { label: "24h Buyback", value: formatCurrency(project.daily.buyback), sub: project.buybackType === "actual" ? "실제 체결 기반" : "추정 모델 기반" },
+    { label: "24h Buyback", value: formatCurrency(project.daily.buyback), sub: buybackTypeLabel(project.buybackType) },
     { label: "Buyback Intensity", value: formatPercent(getBuybackIntensity(project)), sub: "연환산 매입액 / 시총" },
   ];
 
@@ -387,7 +425,7 @@ function renderProjectHero(project) {
   const metrics = [
     { label: "24h Revenue", value: formatCurrency(project.daily.revenue), sub: "프로젝트 수익성" },
     { label: "7d Revenue", value: formatCurrency(project.sevenDay.revenue), sub: "최근 7일 수익" },
-    { label: "30d Buyback", value: formatCurrency(project.thirtyDay.buyback), sub: `${formatPercent(project.revenueToBuybackRatio)} of revenue · ${project.buybackType === "actual" ? "실제" : "추정"}` },
+    { label: "30d Buyback", value: formatCurrency(project.thirtyDay.buyback), sub: `${formatPercent(project.revenueToBuybackRatio)} of revenue · ${buybackTypeLabel(project.buybackType)}` },
     { label: project.tvl ? "TVL" : "Market Cap", value: formatCurrency(project.tvl || project.marketCap), sub: project.tvl ? "Lending 대체 지표" : `${project.token} 기준 시가총액` },
     { label: "Expected Avg Price", value: formatCurrency(project.expectedAverageTokenPrice, false), sub: "예상 매입 수량 계산 기준" },
   ];
@@ -512,7 +550,7 @@ function renderBuybackTable(project) {
         <td>${formatCurrency(row.usd)}</td>
         <td>${formatCurrency(row.price, false)}</td>
         <td><span title="${escapeHtml(row.txHash)}">${escapeHtml(shortHash(row.txHash))}</span></td>
-        <td><span class="pill ${row.buybackType === "actual" ? "positive" : "warning"}">${escapeHtml(row.source)}</span></td>
+        <td><span class="pill ${row.buybackType === "estimated" ? "warning" : "positive"}">${escapeHtml(row.source)}</span></td>
       </tr>
     `)
     .join("");

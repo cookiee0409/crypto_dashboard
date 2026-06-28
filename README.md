@@ -31,3 +31,10 @@ python -m http.server 4173
 ## 주의
 
 브라우저 CORS, 네트워크 제한, API 응답 변경이 있으면 실데이터 갱신이 실패할 수 있으며, 이 경우 샘플/이전 데이터가 유지됩니다. 운영 단계에서는 서버 사이드 프록시, DB 저장, Cron 갱신, 지갑 검증 로직을 추가하는 것이 좋습니다.
+
+## Hyperliquid Assistance Fund
+
+- 기본 Assistance Fund 주소는 `0xfefefefefefefefefefefefefefefefefefefefefefe`입니다.
+- Hyperliquid 공개 `info` API의 `portfolio`, `spotClearinghouseState`, `spotMeta`, `userFillsByTime`을 함께 사용합니다.
+- `spotMeta`에서 HYPE 토큰 index를 찾아 `@107` 같은 spot pair 심볼을 HYPE 매수 체결로 매핑합니다.
+- ASXN buybacks API 후보도 확인했지만 현재 DNS 해석이 실패해 기본 데이터 소스로 사용하지 않습니다.
