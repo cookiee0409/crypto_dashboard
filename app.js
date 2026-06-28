@@ -538,11 +538,12 @@ function renderProjectList() {
       return `
         <button class="project-card ${state.selectedProjectId === project.id ? "active" : ""}" data-project-id="${escapeHtml(project.id)}" type="button">
           <div class="project-card-header">
-            <div>
+            <span class="project-list-avatar" aria-hidden="true">${escapeHtml(project.token?.slice(0, 1) || project.name.slice(0, 1))}</span>
+            <div class="project-card-copy">
               <strong>${escapeHtml(project.name)}</strong>
               <span>${escapeHtml(project.token)} · ${escapeHtml(project.category)}</span>
             </div>
-            <span class="pill ${derived.signalType}">${escapeHtml(derived.signal)}</span>
+            <span class="project-score-chip ${derived.signalType}" aria-label="${escapeHtml(derived.signal)} ${derived.score}점">${derived.score}</span>
           </div>
           <div class="project-card-metrics">
             <div><small>7d Rev</small><b>${formatCurrency(project.sevenDay.revenue)}</b></div>
@@ -563,6 +564,9 @@ function renderProjectList() {
 
 function renderProjectHero(project) {
   const derived = applyDerivedSignal(project);
+  const projection = getProjection(project);
+  const sixMonthRevenue = project.monthlyRevenue.reduce((sum, value) => sum + (Number(value) || 0), 0) * 1000000;
+  const supplyHealth = Math.max(0, 100 - getUnlockRisk(project).score);
   $("#projectTitle").innerHTML = `
     <span class="project-avatar" aria-hidden="true">${escapeHtml(project.token?.slice(0, 1) || project.name.slice(0, 1))}</span>
     <span class="project-title-copy">
@@ -580,10 +584,10 @@ function renderProjectHero(project) {
     .join("");
 
   const metrics = [
-    { label: "30일 매출", value: formatCurrency(project.thirtyDay.revenue), sub: `${getTrendLabel(project.monthlyRevenue).label} · 최근 6개월` },
-    { label: "30일 토큰 환원", value: formatCurrency(project.thirtyDay.buyback), sub: `${buybackTypeLabel(project.buybackType)} 기준` },
-    { label: "토큰 수급 점수", value: `${derived.score} / 100`, sub: derived.signal },
-    { label: "언락 위험도", value: getUnlockRisk(project).label, sub: `${getUnlockPressureRatio(project).toFixed(2)}일치 거래량` },
+    { label: "6개월 수익", value: formatCurrency(sixMonthRevenue), sub: `${getTrendLabel(project.monthlyRevenue).label} · vs 이전 6개월`, spark: renderSparkline(project.monthlyRevenue, `${project.name} 6개월 수익`) },
+    { label: "6개월 예상 환원", value: formatCurrency(projection.baseUsd), sub: `${buybackTypeLabel(project.buybackType)} 기준`, spark: renderSparkline(project.monthlyBuyback, `${project.name} 6개월 환원`) },
+    { label: "토큰 수급 점수", value: `${derived.score}`, sub: `/100 · ${derived.signal}`, meter: derived.score },
+    { label: "보유 구조 건강도", value: `${supplyHealth}`, sub: `/100 · ${getUnlockRisk(project).label}`, meter: supplyHealth, tone: "blue" },
   ];
 
   $("#projectMetrics").innerHTML = metrics
@@ -592,6 +596,8 @@ function renderProjectHero(project) {
         <p>${escapeHtml(metric.label)}</p>
         <strong>${escapeHtml(metric.value)}</strong>
         <span>${escapeHtml(metric.sub)}</span>
+        ${metric.spark ? `<div class="kpi-spark">${metric.spark}</div>` : ""}
+        ${metric.meter !== undefined ? `<div class="kpi-meter ${metric.tone || ""}" style="--score:${Math.max(0, Math.min(100, Number(metric.meter) || 0))}"></div>` : ""}
       </div>
     `)
     .join("");
@@ -1316,6 +1322,7 @@ function renderCompareTable() {
 }
 
 function renderTabs() {
+  document.body.dataset.activeTab = state.activeTab;
   $$(".tab").forEach((tab) => {
     const active = tab.dataset.tab === state.activeTab;
     tab.classList.toggle("active", active);
