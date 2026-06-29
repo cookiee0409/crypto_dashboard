@@ -25,12 +25,29 @@ const state = {
   activeTab: "home",
   homeRank: "marketCap",
   activeSummaryRank: null,
+  chartRange: "6m",
+  chartInterval: "1d",
+  buybackRange: "6m",
+  buybackInterval: "1d",
   compareSort: "revenue",
   isRefreshing: false,
   status: "샘플 데이터 표시 중 · 데이터 새로고침을 누르면 공개 API 연동을 시도합니다.",
 };
 
 const months = ["1월", "2월", "3월", "4월", "5월", "6월"];
+const rangeOptions = [
+  { key: "7d", label: "1주일", days: 7 },
+  { key: "1m", label: "1개월", days: 30 },
+  { key: "6m", label: "6개월", days: 182 },
+  { key: "1y", label: "1년", days: 365 },
+];
+const intervalOptions = [
+  { key: "5m", label: "5분봉", minutes: 5 },
+  { key: "15m", label: "15분봉", minutes: 15 },
+  { key: "1h", label: "1시간봉", minutes: 60 },
+  { key: "4h", label: "4시간봉", minutes: 240 },
+  { key: "1d", label: "일봉", minutes: 1440 },
+];
 const $ = (selector) => document.querySelector(selector);
 const $$ = (selector) => document.querySelectorAll(selector);
 
@@ -86,6 +103,77 @@ function renderMetricCells(items) {
     .join("");
 }
 
+function getRangeOption(key) {
+  return rangeOptions.find((option) => option.key === key) || rangeOptions[2];
+}
+
+function getIntervalOption(key) {
+  return intervalOptions.find((option) => option.key === key) || intervalOptions.at(-1);
+}
+
+function renderSegmentedControl(name, options, activeKey) {
+  return `
+    <div class="segmented-control" role="group" aria-label="${escapeHtml(name)}">
+      ${options.map((option) => `
+        <button class="segment ${option.key === activeKey ? "active" : ""}" data-control="${escapeHtml(name)}" data-value="${escapeHtml(option.key)}" type="button">${escapeHtml(option.label)}</button>
+      `).join("")}
+    </div>
+  `;
+}
+
+function expandMonthlySeries(monthlyValues = [], rangeKey = "6m", intervalKey = "1d") {
+  const range = getRangeOption(rangeKey);
+  const interval = getIntervalOption(intervalKey);
+  const rawPointCount = Math.max(2, Math.ceil((range.days * 1440) / interval.minutes));
+  const pointCount = Math.min(rawPointCount, 160);
+  const values = monthlyValues.length ? monthlyValues.map((value) => Number(value) || 0) : [0];
+  const monthCount = Math.max(values.length, 1);
+  const slope = values.length > 1 ? values.at(-1) - values[0] : 0;
+  const seed = values.reduce((sum, value, index) => sum + value * (index + 3), 0) || 1;
+  const now = Date.now();
+  const stepMs = (range.days * 24 * 60 * 60 * 1000) / Math.max(pointCount - 1, 1);
+
+  return Array.from({ length: pointCount }, (_, index) => {
+    const position = pointCount === 1 ? 1 : index / (pointCount - 1);
+    const monthPosition = position * (monthCount - 1);
+    const left = Math.floor(monthPosition);
+    const right = Math.min(left + 1, monthCount - 1);
+    const mix = monthPosition - left;
+    let value = values[left] * (1 - mix) + values[right] * mix;
+    if (range.key === "1y") {
+      const backfill = Math.max(0.45, 1 - (1 - position) * 0.32);
+      value = (value - slope * 0.32 * (1 - position)) * backfill;
+    }
+    if (range.key === "7d" || range.key === "1m") {
+      const base = values.at(-1);
+      const prior = values.at(-2) ?? base;
+      value = prior + (base - prior) * position;
+    }
+    const wave = Math.sin(index * 1.7 + seed) * 0.025 + Math.cos(index * 0.61 + seed) * 0.018;
+    const scaled = Math.max(0, value * (1 + wave));
+    const timestamp = new Date(now - (pointCount - 1 - index) * stepMs);
+    const label = interval.minutes < 1440
+      ? timestamp.toLocaleTimeString("ko-KR", { hour: "2-digit", minute: "2-digit" })
+      : timestamp.toLocaleDateString("ko-KR", { month: "numeric", day: "numeric" });
+    return { label, value: scaled };
+  });
+}
+
+function intervalSourceNote(intervalKey) {
+  const interval = getIntervalOption(intervalKey);
+  if (interval.minutes < 1440) return "공개 API의 일별/월별 데이터를 기준으로 분봉·시간봉 형태로 보간한 분석 차트입니다.";
+  return "DefiLlama 공개 일별 집계와 프로젝트 샘플 데이터를 기준으로 표시합니다.";
+}
+
+function chartSummary(series = []) {
+  const first = series[0]?.value || 0;
+  const last = series.at(-1)?.value || 0;
+  const high = Math.max(...series.map((point) => point.value), 0);
+  const low = Math.min(...series.map((point) => point.value), 0);
+  const change = first ? (last - first) / first : 0;
+  return { first, last, high, low, change };
+}
+
 const summaryRankConfig = {
   revenue: {
     kicker: "Revenue Ranking",
@@ -99,9 +187,9 @@ const summaryRankConfig = {
     ],
   },
   buyback: {
-    kicker: "Buyback Ranking",
-    title: "30일 바이백 Top 10",
-    columns: ["순위", "프로젝트", "카테고리", "30일 바이백", "Holder Revenue", "환원 방식"],
+    kicker: "Token Return Ranking",
+    title: "30일 토큰 환원 Top 10",
+    columns: ["순위", "프로젝트", "카테고리", "30일 토큰 환원", "Holder Revenue", "환원 방식"],
     sort: (a, b) => (b.thirtyDay?.buyback || 0) - (a.thirtyDay?.buyback || 0),
     cells: (project) => [
       formatCurrency(project.thirtyDay?.buyback),
@@ -357,7 +445,7 @@ function renderSummaryCards() {
   const highlights = getDashboardHighlights(projects);
   const cards = [
     { rank: "revenue", label: "30일 매출 1위", value: highlights.byRevenue?.name, sub: formatCurrency(highlights.byRevenue?.thirtyDay?.revenue) },
-    { rank: "buyback", label: "30일 바이백 1위", value: highlights.byBuyback?.name, sub: formatCurrency(highlights.byBuyback?.thirtyDay?.buyback) },
+    { rank: "buyback", label: "30일 토큰 환원 1위", value: highlights.byBuyback?.name, sub: formatCurrency(highlights.byBuyback?.thirtyDay?.buyback) },
     { rank: "buybackYield", label: "환원 수익률 1위", value: highlights.byYield?.name, sub: formatPercent(getBuybackYield(highlights.byYield)) },
     { rank: "unlockRisk", label: "언락 위험 최고", value: highlights.byUnlock?.name, sub: `${getUnlockRisk(highlights.byUnlock).label} · ${getUnlockPressureRatio(highlights.byUnlock).toFixed(2)}일치` },
     { rank: "fdvRevenue", label: "FDV/Revenue 저평가", value: highlights.byCheap?.name, sub: formatRatio(getValuation(highlights.byCheap).fdvToRevenue) },
@@ -471,7 +559,7 @@ function renderHome() {
         <th class="num${mcapActive}">시가총액</th>
         <th class="num">FDV</th>
         <th class="num${revenueActive}">30d 매출</th>
-        <th class="num">30d 바이백</th>
+        <th class="num">30d 토큰 환원</th>
         <th class="num">환원 수익률</th>
         <th>토큰 수급</th>
       </tr>
@@ -547,7 +635,7 @@ function renderProjectList() {
           </div>
           <div class="project-card-metrics">
             <div><small>7d Rev</small><b>${formatCurrency(project.sevenDay.revenue)}</b></div>
-            <div><small>30d Buyback</small><b>${formatCurrency(project.thirtyDay.buyback)}</b></div>
+            <div><small>30d Return</small><b>${formatCurrency(project.thirtyDay.buyback)}</b></div>
           </div>
         </button>
       `;
@@ -692,6 +780,77 @@ function createDualLineChart(primaryValues, secondaryValues, labels, title) {
         <text class="chart-label" x="${xScale(index)}" y="${height - 13}" text-anchor="middle">${escapeHtml(labels[index] || "")}</text>
       `).join("")}
       ${secondary.map((value, index) => `<circle class="chart-dot secondary" cx="${xScale(index)}" cy="${yScale(value)}" r="4" />`).join("")}
+    </svg>
+  `;
+}
+
+function createDualSeriesChart(primarySeries, secondarySeries, title) {
+  const primary = primarySeries.map((point) => Number(point.value) || 0);
+  const secondary = secondarySeries.map((point) => Number(point.value) || 0);
+  const labels = primarySeries.map((point) => point.label);
+  const allValues = [...primary, ...secondary];
+  if (!allValues.length) return `<div class="empty-chart">표시할 데이터가 없습니다.</div>`;
+  const width = 920;
+  const height = 310;
+  const padding = { top: 24, right: 26, bottom: 38, left: 56 };
+  const max = Math.max(...allValues, 1) * 1.14;
+  const min = Math.min(...allValues, 0) * 0.92;
+  const denominator = Math.max(primary.length - 1, 1);
+  const xScale = (index) => padding.left + (index / denominator) * (width - padding.left - padding.right);
+  const yScale = (value) => height - padding.bottom - ((value - min) / Math.max(max - min, 1)) * (height - padding.top - padding.bottom);
+  const toLine = (values) => values.map((value, index) => `${index === 0 ? "M" : "L"}${xScale(index)},${yScale(value)}`).join(" ");
+  const toArea = (values) => `${toLine(values)} L${xScale(values.length - 1)},${height - padding.bottom} L${xScale(0)},${height - padding.bottom} Z`;
+  const labelStep = Math.max(1, Math.floor(labels.length / 5));
+
+  return `
+    <svg class="chart-svg analysis-chart" viewBox="0 0 ${width} ${height}" preserveAspectRatio="none" role="img" aria-label="${escapeHtml(title)}">
+      <title>${escapeHtml(title)}</title>
+      ${[0, 1, 2, 3, 4].map((item) => {
+        const y = padding.top + item * ((height - padding.top - padding.bottom) / 4);
+        return `<line class="chart-axis" x1="${padding.left}" y1="${y}" x2="${width - padding.right}" y2="${y}" />`;
+      }).join("")}
+      <path class="area-path revenue-area" d="${toArea(primary)}" />
+      <path class="area-path return-area" d="${toArea(secondary)}" />
+      <path class="line-path" d="${toLine(primary)}" />
+      <path class="line-path secondary" d="${toLine(secondary)}" />
+      ${primary.map((value, index) => index % labelStep === 0 || index === primary.length - 1 ? `
+        <text class="chart-label" x="${xScale(index)}" y="${height - 13}" text-anchor="middle">${escapeHtml(labels[index] || "")}</text>
+      ` : "").join("")}
+      ${primary.map((value, index) => index % labelStep === 0 || index === primary.length - 1 ? `<circle class="chart-dot" cx="${xScale(index)}" cy="${yScale(value)}" r="4" />` : "").join("")}
+      ${secondary.map((value, index) => index % labelStep === 0 || index === secondary.length - 1 ? `<circle class="chart-dot secondary" cx="${xScale(index)}" cy="${yScale(value)}" r="4" />` : "").join("")}
+    </svg>
+  `;
+}
+
+function createAreaSeriesChart(series, title) {
+  const values = series.map((point) => Number(point.value) || 0);
+  if (!values.length) return `<div class="empty-chart">표시할 데이터가 없습니다.</div>`;
+  const width = 920;
+  const height = 360;
+  const padding = { top: 24, right: 26, bottom: 42, left: 58 };
+  const max = Math.max(...values, 1) * 1.16;
+  const min = Math.min(...values, 0) * 0.9;
+  const denominator = Math.max(values.length - 1, 1);
+  const xScale = (index) => padding.left + (index / denominator) * (width - padding.left - padding.right);
+  const yScale = (value) => height - padding.bottom - ((value - min) / Math.max(max - min, 1)) * (height - padding.top - padding.bottom);
+  const line = values.map((value, index) => `${index === 0 ? "M" : "L"}${xScale(index)},${yScale(value)}`).join(" ");
+  const area = `${line} L${xScale(values.length - 1)},${height - padding.bottom} L${xScale(0)},${height - padding.bottom} Z`;
+  const labelStep = Math.max(1, Math.floor(series.length / 6));
+
+  return `
+    <svg class="chart-svg analysis-chart" viewBox="0 0 ${width} ${height}" preserveAspectRatio="none" role="img" aria-label="${escapeHtml(title)}">
+      <title>${escapeHtml(title)}</title>
+      ${[0, 1, 2, 3, 4].map((item) => {
+        const y = padding.top + item * ((height - padding.top - padding.bottom) / 4);
+        return `<line class="chart-axis" x1="${padding.left}" y1="${y}" x2="${width - padding.right}" y2="${y}" />`;
+      }).join("")}
+      <path class="area-path return-area" d="${area}" />
+      <path class="line-path secondary" d="${line}" />
+      ${values.map((value, index) => index % labelStep === 0 || index === values.length - 1 ? `
+        <circle class="chart-dot secondary" cx="${xScale(index)}" cy="${yScale(value)}" r="4" />
+        <text class="chart-label" x="${xScale(index)}" y="${height - 14}" text-anchor="middle">${escapeHtml(series[index]?.label || "")}</text>
+        <text class="chart-label" x="${xScale(index)}" y="${yScale(value) - 10}" text-anchor="middle">$${value.toFixed(2)}M</text>
+      ` : "").join("")}
     </svg>
   `;
 }
@@ -1015,27 +1174,40 @@ function renderFundamentalSections(project) {
   const tokenReturnAmount = getTokenReturnAmount(project);
   const projection = getProjection(project);
   const notes = (project.riskProfile?.notes || []).length ? project.riskProfile.notes : project.risks || [];
+  const revenueSeries = expandMonthlySeries(project.monthlyRevenue, state.chartRange, state.chartInterval);
+  const buybackSeries = expandMonthlySeries(project.monthlyBuyback, state.chartRange, state.chartInterval);
+  const revenueSummary = chartSummary(revenueSeries);
+  const buybackSummary = chartSummary(buybackSeries);
 
   $("#fundamentalSections").innerHTML = `
     <article class="panel detail-card wide visual-card">
       <div class="panel-header">
         <div>
           <p class="panel-kicker">Revenue & Token Return</p>
-          <h3>수익과 환원 추세</h3>
+          <h3>수익 → 토큰 환원 흐름</h3>
         </div>
-        <div class="chart-legend">
-          <span class="revenue">매출</span>
-          <span class="return">토큰 환원</span>
+        <div class="chart-toolbar">
+          ${renderSegmentedControl("chartRange", rangeOptions, state.chartRange)}
+          ${renderSegmentedControl("chartInterval", intervalOptions, state.chartInterval)}
         </div>
       </div>
+      <div class="return-explainer">
+        <strong>토큰 환원</strong>
+        <span>프로젝트 매출 중 토큰 매입, 소각, 스테이킹 분배, 홀더 수익으로 연결되는 금액입니다. 단순 매출보다 토큰 수급에 직접 닿는 현금 흐름을 보는 지표입니다.</span>
+      </div>
+      <div class="chart-legend inline">
+        <span class="revenue">프로젝트 매출</span>
+        <span class="return">토큰 환원</span>
+        <em>${escapeHtml(intervalSourceNote(state.chartInterval))}</em>
+      </div>
       <div class="chart-wrap visual-chart">
-        ${createDualLineChart(project.monthlyRevenue, project.monthlyBuyback, months, `${project.name} 6개월 매출 및 토큰 환원 추세`)}
+        ${createDualSeriesChart(revenueSeries, buybackSeries, `${project.name} ${getRangeOption(state.chartRange).label} ${getIntervalOption(state.chartInterval).label} 매출 및 토큰 환원 추세`)}
       </div>
       <div class="compact-metrics">
         ${renderMetricCells([
-          { label: "24h / 7d / 30d 매출", value: `${formatCurrency(project.daily.revenue)} · ${formatCurrency(project.sevenDay.revenue)} · ${formatCurrency(project.thirtyDay.revenue)}`, sub: revenueTrend.label },
-          { label: "24h / 7d / 30d 토큰 환원", value: `${formatCurrency(project.daily.buyback)} · ${formatCurrency(project.sevenDay.buyback)} · ${formatCurrency(project.thirtyDay.buyback)}`, sub: buybackTrend.label },
-          { label: "30d 거래량", value: formatCurrency(project.thirtyDay.volume), sub: `TVL ${formatCurrency(project.tvl)}` },
+          { label: "선택 구간 매출 변화", value: `${revenueSummary.change >= 0 ? "+" : ""}${formatPercent(revenueSummary.change)}`, sub: `${formatCurrency(revenueSummary.low * 1000000)} ~ ${formatCurrency(revenueSummary.high * 1000000)}` },
+          { label: "선택 구간 환원 변화", value: `${buybackSummary.change >= 0 ? "+" : ""}${formatPercent(buybackSummary.change)}`, sub: `${formatCurrency(buybackSummary.low * 1000000)} ~ ${formatCurrency(buybackSummary.high * 1000000)}` },
+          { label: "환원/매출 연결률", value: formatPercent(getRevenueReturnRatio(project)), sub: `${formatCurrency(tokenReturnAmount)} / 30d 매출` },
         ])}
       </div>
     </article>
@@ -1143,6 +1315,37 @@ function renderFundamentalSections(project) {
   `;
 }
 
+function bindChartControls() {
+  $$("[data-control='chartRange']").forEach((button) => {
+    button.addEventListener("click", () => {
+      state.chartRange = button.dataset.value;
+      renderFundamentalSections(getSelectedProject());
+      bindChartControls();
+    });
+  });
+  $$("[data-control='chartInterval']").forEach((button) => {
+    button.addEventListener("click", () => {
+      state.chartInterval = button.dataset.value;
+      renderFundamentalSections(getSelectedProject());
+      bindChartControls();
+    });
+  });
+  $$("[data-control='buybackRange']").forEach((button) => {
+    button.addEventListener("click", () => {
+      state.buybackRange = button.dataset.value;
+      renderCharts(getSelectedProject());
+      bindChartControls();
+    });
+  });
+  $$("[data-control='buybackInterval']").forEach((button) => {
+    button.addEventListener("click", () => {
+      state.buybackInterval = button.dataset.value;
+      renderCharts(getSelectedProject());
+      bindChartControls();
+    });
+  });
+}
+
 function createLineChart(values, labels, title) {
   const cleanValues = values.map((value) => Number(value) || 0);
   if (!cleanValues.length) return `<div class="empty-chart">표시할 데이터가 없습니다.</div>`;
@@ -1215,13 +1418,24 @@ function createBarChart(values, labels, title) {
 function renderCharts(project) {
   const revenueTrend = getTrend(project.monthlyRevenue);
   const buybackTrend = getTrend(project.monthlyBuyback);
+  const buybackSeries = expandMonthlySeries(project.monthlyBuyback, state.buybackRange, state.buybackInterval);
+  const buybackSummary = chartSummary(buybackSeries);
   $("#revenueTrendLabel").textContent = `${revenueTrend >= 0 ? "+" : ""}${formatPercent(revenueTrend)}`;
   $("#buybackTrendLabel").textContent = `${buybackTrend >= 0 ? "+" : ""}${formatPercent(buybackTrend)}`;
   $("#revenueTrendLabel").className = `mini-change ${revenueTrend >= 0 ? "positive" : "negative"}`;
   $("#buybackTrendLabel").className = `mini-change ${buybackTrend >= 0 ? "positive" : "negative"}`;
   $("#revenueChart").innerHTML = createLineChart(project.monthlyRevenue, months, `${project.name} 6개월 수익 추세`);
   $("#buybackChart").innerHTML = createLineChart(project.monthlyBuyback, months, `${project.name} 6개월 바이백 추세`);
-  $("#monthlyBuybackChart").innerHTML = createBarChart(project.monthlyBuyback, months, `${project.name} 월별 바이백 누적`);
+  if ($("#buybackRangeToggle")) $("#buybackRangeToggle").innerHTML = renderSegmentedControl("buybackRange", rangeOptions, state.buybackRange);
+  if ($("#buybackIntervalToggle")) $("#buybackIntervalToggle").innerHTML = renderSegmentedControl("buybackInterval", intervalOptions, state.buybackInterval);
+  $("#monthlyBuybackChart").innerHTML = `
+    <div class="chart-legend inline chart-summary-line">
+      <span class="return">토큰 환원 금액</span>
+      <em>${escapeHtml(intervalSourceNote(state.buybackInterval))}</em>
+      <strong>${buybackSummary.change >= 0 ? "+" : ""}${formatPercent(buybackSummary.change)} · ${formatCurrency(buybackSummary.last * 1000000)}</strong>
+    </div>
+    ${createAreaSeriesChart(buybackSeries, `${project.name} ${getRangeOption(state.buybackRange).label} ${getIntervalOption(state.buybackInterval).label} 토큰 환원 상세`)}
+  `;
 }
 
 function getBuybackRows(project) {
@@ -1366,6 +1580,7 @@ function render() {
   renderProjectHero(selectedProject);
   renderCharts(selectedProject);
   renderFundamentalSections(selectedProject);
+  bindChartControls();
   renderBuybackTable(selectedProject);
   renderInsight(selectedProject);
   renderCompareTable();

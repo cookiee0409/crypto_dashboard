@@ -3,7 +3,7 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>코인 프로젝트 수익·바이백 대시보드 MVP</title>
+    <title>코인 프로젝트 수익·토큰 환원 대시보드</title>
     <link rel="stylesheet" href="./styles.css" />
   </head>
   <body>
@@ -11,7 +11,7 @@
       <header class="topbar">
         <div>
           <p class="eyebrow">CryptoLens</p>
-          <h1>프로젝트 수익·바이백 현황</h1>
+          <h1>프로젝트 수익·토큰 환원 현황</h1>
         </div>
         <div class="topbar-actions">
           <div class="search-box">
@@ -208,7 +208,7 @@
                 정렬
                 <select id="compareSort">
                   <option value="revenue">매출 높은 순</option>
-                  <option value="buyback">바이백 높은 순</option>
+                  <option value="buyback">토큰 환원 높은 순</option>
                   <option value="buybackYield">환원 수익률 높은 순</option>
                   <option value="fdvRevenue">FDV/Revenue 낮은 순</option>
                   <option value="unlockRisk">언락 위험도 높은 순</option>
@@ -226,7 +226,7 @@
                     <th>FDV</th>
                     <th>30d 수익</th>
                     <th>30d Holder Revenue</th>
-                    <th>30d 바이백</th>
+                    <th>30d 토큰 환원</th>
                     <th>FDV/Revenue</th>
                     <th>MCAP/Holder Rev</th>
                     <th>TVL</th>
@@ -246,9 +246,17 @@
           <article class="panel full-width">
             <div class="panel-header">
               <div>
-                <p class="panel-kicker">Buyback Tracker</p>
-                <h3>프로젝트 상세 · 월별 바이백 누적</h3>
+                <p class="panel-kicker">Token Return Tracker</p>
+                <h3>프로젝트 상세 · 토큰 환원 추적</h3>
               </div>
+              <div class="chart-toolbar detached">
+                <div id="buybackRangeToggle"></div>
+                <div id="buybackIntervalToggle"></div>
+              </div>
+            </div>
+            <div class="return-explainer wide">
+              <strong>토큰 환원 상세</strong>
+              <span>바이백, 소각, 홀더 수익, 스테이킹 분배처럼 토큰 보유자에게 경제적 가치가 연결되는 흐름을 같은 축에서 추적합니다. 분봉·시간봉은 공개 일별 데이터 기반 보간입니다.</span>
             </div>
             <div class="chart-wrap tall" id="monthlyBuybackChart"></div>
           </article>

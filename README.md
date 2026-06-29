@@ -1,4 +1,4 @@
-# 코인 프로젝트 수익·바이백 대시보드 MVP
+# 코인 프로젝트 수익·토큰 환원 대시보드
 
 정적 HTML/CSS/JS 기반 대시보드입니다. 샘플 데이터를 기본 폴백으로 두고, 브라우저에서 공개 API 호출이 가능한 경우 실제 데이터로 갱신합니다.
 
@@ -26,8 +26,10 @@ python -m http.server 4173
 - DefiLlama protocol slug 기반 공개 수익 데이터 갱신
 - Hyperliquid Assistance Fund 주소와 DefiLlama Token Buy Back / Holder Net Income 지표 연동
 - 프로젝트 수익성, 토큰 가치 연결, 언락 및 매도 압력, 실사용 성장, 신뢰도/리스크 섹션
+- 토큰 환원 의미 안내 및 1주일/1개월/6개월/1년, 5분봉/15분봉/1시간봉/4시간봉/일봉 차트 전환
 - FDV/Revenue, MCAP/Holder Revenue, FDV/TVL, 환원 수익률, 언락 위험도 자동 계산
-- 매출, 바이백, 환원 수익률, FDV/Revenue, 언락 위험도, TVL 기준 비교 테이블 정렬
+- 전체 추적 프로젝트 풀 기준 매출, 토큰 환원, 환원 수익률, FDV/Revenue, 언락 위험도, 실사용 성장 Top 10 랭킹
+- 매출, 토큰 환원, 환원 수익률, FDV/Revenue, 언락 위험도, TVL 기준 비교 테이블 정렬
 - 실제/추정 바이백 구분 및 txHash 포함 CSV 내보내기
 - 요청서 기준 토큰 수급 점수 산식 반영
 - 상시 투자 조언 아님 면책 문구 표시
