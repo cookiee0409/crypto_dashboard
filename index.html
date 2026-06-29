@@ -102,16 +102,6 @@
               <div class="metric-strip" id="projectMetrics"></div>
             </div>
 
-            <nav class="project-section-tabs" aria-label="프로젝트 상세 섹션">
-              <a href="#fundamentalSections" class="active">개요</a>
-              <a href="#fundamentalSections">재무 및 수익</a>
-              <a href="#fundamentalSections">토큰 이코노믹스</a>
-              <a href="#fundamentalSections">언락 및 유통</a>
-              <a href="#fundamentalSections">실사용 및 성장</a>
-              <a href="#fundamentalSections">피어 비교</a>
-              <a href="#fundamentalSections">리스크</a>
-            </nav>
-
             <div class="chart-grid hidden">
               <article class="panel chart-card">
                 <div class="panel-header">
@@ -137,32 +127,6 @@
             </div>
 
             <div class="fundamental-grid" id="fundamentalSections"></div>
-
-            <article class="panel table-card">
-              <div class="panel-header">
-                <div>
-                  <p class="panel-kicker">Recent Events</p>
-                  <h3>최근 토큰 환원 내역</h3>
-                </div>
-                <button class="ghost-button small" id="exportCsvButton" type="button">CSV 내보내기</button>
-              </div>
-              <div class="table-scroll">
-                <table>
-                  <thead>
-                    <tr>
-                      <th>날짜</th>
-                      <th>프로젝트</th>
-                      <th>환원 토큰</th>
-                      <th>금액</th>
-                      <th>평균가</th>
-                      <th>Tx Hash</th>
-                      <th>출처</th>
-                    </tr>
-                  </thead>
-                  <tbody id="buybackTable"></tbody>
-                </table>
-              </div>
-            </article>
           </section>
 
           <aside class="panel insight-panel">
@@ -243,22 +207,46 @@
         </section>
 
         <section class="hidden" id="buybacksTab" role="tabpanel" aria-labelledby="tab-buybacks">
-          <article class="panel full-width">
+          <div class="project-detail-grid" id="projectDetailSections"></div>
+
+          <article class="panel full-width compact-chart-panel">
             <div class="panel-header">
               <div>
-                <p class="panel-kicker">Token Return Tracker</p>
-                <h3>프로젝트 상세 · 토큰 환원 추적</h3>
-              </div>
-              <div class="chart-toolbar detached">
-                <div id="buybackRangeToggle"></div>
-                <div id="buybackIntervalToggle"></div>
+                <p class="panel-kicker">Project Detail</p>
+                <h3>월별 토큰 환원</h3>
               </div>
             </div>
             <div class="return-explainer wide">
               <strong>토큰 환원 상세</strong>
-              <span>바이백, 소각, 홀더 수익, 스테이킹 분배처럼 토큰 보유자에게 경제적 가치가 연결되는 흐름을 같은 축에서 추적합니다. 분봉·시간봉은 공개 일별 데이터 기반 보간입니다.</span>
+              <span>바이백, 소각, 홀더 수익, 스테이킹 분배처럼 토큰 보유자에게 경제적 가치가 연결되는 금액입니다. 상세 화면에서는 월별 막대와 정의 중심으로 봅니다.</span>
             </div>
-            <div class="chart-wrap tall" id="monthlyBuybackChart"></div>
+            <div class="chart-wrap compact-bars" id="monthlyBuybackChart"></div>
+          </article>
+
+          <article class="panel table-card full-width">
+            <div class="panel-header">
+              <div>
+                <p class="panel-kicker">Token Return Events</p>
+                <h3>최근 토큰 환원 내역</h3>
+              </div>
+              <button class="ghost-button small" id="exportCsvButton" type="button">CSV 내보내기</button>
+            </div>
+            <div class="table-scroll">
+              <table>
+                <thead>
+                  <tr>
+                    <th>날짜</th>
+                    <th>프로젝트</th>
+                    <th>환원 토큰</th>
+                    <th>금액</th>
+                    <th>평균가</th>
+                    <th>Tx Hash</th>
+                    <th>출처</th>
+                  </tr>
+                </thead>
+                <tbody id="buybackTable"></tbody>
+              </table>
+            </div>
           </article>
         </section>
 

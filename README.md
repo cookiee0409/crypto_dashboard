@@ -26,7 +26,7 @@ python -m http.server 4173
 - DefiLlama protocol slug 기반 공개 수익 데이터 갱신
 - Hyperliquid Assistance Fund 주소와 DefiLlama Token Buy Back / Holder Net Income 지표 연동
 - 프로젝트 수익성, 토큰 가치 연결, 언락 및 매도 압력, 실사용 성장, 신뢰도/리스크 섹션
-- 토큰 환원 의미 안내 및 1주일/1개월/6개월/1년, 5분봉/15분봉/1시간봉/4시간봉/일봉 차트 전환
+- 대시보드 1개월/6개월/1년 수익 추세 전환과 프로젝트 상세 월별 토큰 환원 막대 차트
 - FDV/Revenue, MCAP/Holder Revenue, FDV/TVL, 환원 수익률, 언락 위험도 자동 계산
 - 전체 추적 프로젝트 풀 기준 매출, 토큰 환원, 환원 수익률, FDV/Revenue, 언락 위험도, 실사용 성장 Top 10 랭킹
 - 매출, 토큰 환원, 환원 수익률, FDV/Revenue, 언락 위험도, TVL 기준 비교 테이블 정렬
