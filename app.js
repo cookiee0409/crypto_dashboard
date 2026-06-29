@@ -25,18 +25,12 @@ const state = {
   activeTab: "home",
   homeRank: "marketCap",
   activeSummaryRank: null,
-  chartRange: "1y",
   compareSort: "revenue",
   isRefreshing: false,
   status: "샘플 데이터 표시 중 · 데이터 새로고침을 누르면 공개 API 연동을 시도합니다.",
 };
 
 const months = ["1월", "2월", "3월", "4월", "5월", "6월"];
-const rangeOptions = [
-  { key: "1m", label: "1개월", days: 30 },
-  { key: "6m", label: "6개월", days: 182 },
-  { key: "1y", label: "1년", days: 365 },
-];
 const $ = (selector) => document.querySelector(selector);
 const $$ = (selector) => document.querySelectorAll(selector);
 
@@ -92,52 +86,11 @@ function renderMetricCells(items) {
     .join("");
 }
 
-function getRangeOption(key) {
-  return rangeOptions.find((option) => option.key === key) || rangeOptions[2];
-}
-
-function renderSegmentedControl(name, options, activeKey) {
-  return `
-    <div class="segmented-control" role="group" aria-label="${escapeHtml(name)}">
-      ${options.map((option) => `
-        <button class="segment ${option.key === activeKey ? "active" : ""}" data-control="${escapeHtml(name)}" data-value="${escapeHtml(option.key)}" type="button">${escapeHtml(option.label)}</button>
-      `).join("")}
-    </div>
-  `;
-}
-
-function expandMonthlySeries(monthlyValues = [], rangeKey = "6m") {
-  const range = getRangeOption(rangeKey);
-  const pointCount = range.key === "1m" ? 30 : range.key === "6m" ? 26 : 52;
-  const values = monthlyValues.length ? monthlyValues.map((value) => Number(value) || 0) : [0];
-  const monthCount = Math.max(values.length, 1);
-  const slope = values.length > 1 ? values.at(-1) - values[0] : 0;
-  const seed = values.reduce((sum, value, index) => sum + value * (index + 3), 0) || 1;
-  const now = Date.now();
-  const stepMs = (range.days * 24 * 60 * 60 * 1000) / Math.max(pointCount - 1, 1);
-
-  return Array.from({ length: pointCount }, (_, index) => {
-    const position = pointCount === 1 ? 1 : index / (pointCount - 1);
-    const monthPosition = position * (monthCount - 1);
-    const left = Math.floor(monthPosition);
-    const right = Math.min(left + 1, monthCount - 1);
-    const mix = monthPosition - left;
-    let value = values[left] * (1 - mix) + values[right] * mix;
-    if (range.key === "1y") {
-      const backfill = Math.max(0.45, 1 - (1 - position) * 0.32);
-      value = (value - slope * 0.32 * (1 - position)) * backfill;
-    }
-    if (range.key === "7d" || range.key === "1m") {
-      const base = values.at(-1);
-      const prior = values.at(-2) ?? base;
-      value = prior + (base - prior) * position;
-    }
-    const wave = Math.sin(index * 1.7 + seed) * 0.025 + Math.cos(index * 0.61 + seed) * 0.018;
-    const scaled = Math.max(0, value * (1 + wave));
-    const timestamp = new Date(now - (pointCount - 1 - index) * stepMs);
-    const label = timestamp.toLocaleDateString("ko-KR", { month: "numeric", day: "numeric" });
-    return { label, value: scaled };
-  });
+function createMonthlySeries(monthlyValues = []) {
+  return monthlyValues.map((value, index) => ({
+    label: months[index] || `${index + 1}월`,
+    value: Number(value) || 0,
+  }));
 }
 
 function chartSummary(series = []) {
@@ -210,7 +163,7 @@ function createDashboardLineChart(series, title, unitLabel = "수익", project =
       </svg>
       <div class="chart-axis-caption">
         <span><i class="legend-revenue"></i>수익 금액</span>
-        <span><i class="legend-yield"></i>연환산 수익/시총</span>
+        <span><i class="legend-yield"></i>매출 연환산 / 시총</span>
         <span>Y축: ${escapeHtml(unitLabel)}(USD)</span>
       </div>
     </div>
@@ -743,17 +696,15 @@ function renderProjectHero(project) {
   $("#projectSignal").textContent = `${derived.signal} · ${derived.score}점`;
   $("#projectSignal").className = `pill ${derived.signalType}`;
   $("#projectSignal").setAttribute("aria-label", `토큰 수급 진단 ${derived.signal}, 점수 ${derived.score}점`);
-  $("#projectDescription").textContent = project.description;
+  $("#projectDescription").textContent = "";
   $("#lastUpdated").textContent = project.lastUpdated;
-  $("#projectSourceLinks").innerHTML = (project.sourceLinks || [])
-    .map((link) => `<a href="${escapeHtml(link.url)}" target="_blank" rel="noreferrer">${escapeHtml(link.label)}</a>`)
-    .join("");
+  $("#projectSourceLinks").innerHTML = "";
 
   const metrics = [
     { label: "6개월 수익", value: formatCurrency(sixMonthRevenue), sub: `${getTrendLabel(project.monthlyRevenue).label} · vs 이전 6개월`, spark: renderSparkline(project.monthlyRevenue, `${project.name} 6개월 수익`) },
     { label: "6개월 예상 환원", value: formatCurrency(projection.baseUsd), sub: `${buybackTypeLabel(project.buybackType)} 기준`, spark: renderSparkline(project.monthlyBuyback, `${project.name} 6개월 환원`) },
     { label: "토큰 수급 점수", value: `${derived.score}`, sub: `/100 · ${derived.signal}`, meter: derived.score },
-    { label: "보유 구조 건강도", value: `${supplyHealth}`, sub: `/100 · ${getUnlockRisk(project).label}`, meter: supplyHealth, tone: "blue" },
+    { label: "언락/유통 부담 점수", value: `${supplyHealth}`, sub: `/100 · ${getUnlockRisk(project).label}`, meter: supplyHealth, tone: "blue" },
   ];
 
   $("#projectMetrics").innerHTML = metrics
@@ -1313,7 +1264,7 @@ function renderFundamentalSections(project) {
   const signal = getSignalFromScore(score);
   const unlockRisk = getUnlockRisk(project);
   const projection = getProjection(project);
-  const revenueSeries = expandMonthlySeries(project.monthlyRevenue, state.chartRange);
+  const revenueSeries = createMonthlySeries(project.monthlyRevenue);
   const sixMonthRevenue = sumMillions(project.monthlyRevenue);
   const mom = monthOverMonth(project.monthlyRevenue);
   const revenueYield = annualizedRevenueYield(project);
@@ -1324,20 +1275,17 @@ function renderFundamentalSections(project) {
       <div class="panel-header">
         <div>
           <p class="panel-kicker">Revenue Trend</p>
-          <h3>수익 추세</h3>
-        </div>
-        <div class="chart-toolbar">
-          ${renderSegmentedControl("chartRange", rangeOptions, state.chartRange)}
+          <h3>최근 6개월 월별 수익</h3>
         </div>
       </div>
       <div class="dashboard-kpi-row">
         <div><span>최근 1개월 수익</span><strong>${formatCurrency(project.thirtyDay.revenue)}</strong></div>
         <div><span>최근 6개월 수익</span><strong>${formatCurrency(sixMonthRevenue)}</strong></div>
         <div><span>전월 대비</span><strong class="${mom >= 0 ? "positive-text" : "negative-text"}">${mom >= 0 ? "+" : ""}${formatPercent(mom)}</strong></div>
-        <div><span>연환산 수익/시총</span><strong>${formatPercent(revenueYield)}</strong></div>
+        <div><span>매출 연환산 / 시총</span><strong>${formatPercent(revenueYield)}</strong></div>
       </div>
       <div class="chart-wrap visual-chart dashboard-revenue-chart">
-        ${createDashboardLineChart(revenueSeries, `${project.name} ${getRangeOption(state.chartRange).label} 수익 추세`, "프로젝트 수익", project)}
+        ${createDashboardLineChart(revenueSeries, `${project.name} 최근 6개월 월별 수익`, "프로젝트 수익", project)}
       </div>
     </article>
 
@@ -1398,15 +1346,7 @@ function renderFundamentalSections(project) {
   `;
 }
 
-function bindChartControls() {
-  $$("[data-control='chartRange']").forEach((button) => {
-    button.addEventListener("click", () => {
-      state.chartRange = button.dataset.value;
-      renderFundamentalSections(getSelectedProject());
-      bindChartControls();
-    });
-  });
-}
+function bindChartControls() {}
 
 function bindFinancialChartInteractions() {
   $$(".financial-chart").forEach((chart) => {
@@ -1548,10 +1488,13 @@ function renderCharts(project) {
   if ($("#buybackChart")) $("#buybackChart").innerHTML = createLineChart(project.monthlyBuyback, months, `${project.name} 6개월 토큰 환원 추세`);
   if ($("#monthlyBuybackChart")) {
     const latest = project.monthlyBuyback.at(-1) || 0;
+    const rows = getBuybackRows(project);
+    const estimated = rows.every((row) => row.buybackType === "estimated");
     $("#monthlyBuybackChart").innerHTML = `
       <div class="chart-legend inline chart-summary-line">
         <span class="return">월별 토큰 환원</span>
-        <em>실제 월별 데이터 또는 공개 데이터 기반 추정치</em>
+        <em>${estimated ? "추정 월별 데이터" : "공개 이벤트 기반 실제 데이터 포함"}</em>
+        <span class="pill ${estimated ? "warning" : "positive"}">${estimated ? "추정치" : "실제 이벤트 포함"}</span>
         <strong>${buybackTrend >= 0 ? "+" : ""}${formatPercent(buybackTrend)} · 최근 ${formatCurrency(latest * 1000000)}</strong>
       </div>
       ${createSimpleBarChart(project.monthlyBuyback, months, `${project.name} 월별 토큰 환원`)}
@@ -1586,7 +1529,7 @@ function renderBuybackTable(project) {
         <td>${formatNumber(row.tokenAmount, 0)} ${escapeHtml(project.token)}</td>
         <td>${formatCurrency(row.usd)}</td>
         <td>${formatCurrency(row.price, false)}</td>
-        <td><span title="${escapeHtml(row.txHash)}">${escapeHtml(shortHash(row.txHash))}</span></td>
+        <td>${row.buybackType === "estimated" ? `<span class="muted-hash">추정 이벤트</span>` : `<span title="${escapeHtml(row.txHash)}">${escapeHtml(shortHash(row.txHash))}</span>`}</td>
         <td><span class="pill ${row.buybackType === "estimated" ? "warning" : "positive"}">${escapeHtml(row.source)}</span></td>
       </tr>
     `)
@@ -1617,6 +1560,12 @@ function renderProjectDetailSections(project) {
         <div><strong>환원 수익률</strong><span>30일 토큰 환원을 연환산해 현재 시가총액으로 나눈 값입니다.</span><b>${formatPercent(getBuybackYield(project))}</b></div>
         <div><strong>6개월 예상 환원</strong><span>최근 3개월 평균, 추세, 예상 평균 토큰 가격을 반영한 기준 시나리오입니다.</span><b>${formatCurrency(projection.baseUsd)}</b></div>
         <div><strong>FDV/Revenue</strong><span>FDV를 연환산 매출로 나눈 밸류에이션 배수입니다.</span><b>${formatRatio(valuation.fdvToRevenue)}</b></div>
+      </div>
+      <div class="detail-source-block">
+        <p>${escapeHtml(project.description)}</p>
+        <div>
+          ${(project.sourceLinks || []).map((link) => `<a href="${escapeHtml(link.url)}" target="_blank" rel="noreferrer">${escapeHtml(link.label)}</a>`).join("")}
+        </div>
       </div>
     </article>
 
@@ -1740,24 +1689,16 @@ function renderCompareTable() {
 
   $("#compareTable").innerHTML = sorted
     .map((project) => {
-      const valuation = getValuation(project);
       const unlockRisk = getUnlockRisk(project);
       return `
         <tr>
-          <td>${escapeHtml(project.name)}<span class="subtext">${escapeHtml(project.token)}</span></td>
-          <td>${escapeHtml(project.category)}</td>
-          <td>${formatCurrency(project.marketCap)}</td>
-          <td>${formatCurrency(project.fdv)}</td>
+          <td>${escapeHtml(project.name)}<span class="subtext">${escapeHtml(project.token)} · ${escapeHtml(project.category)}</span></td>
           <td>${formatCurrency(project.thirtyDay.revenue)}</td>
-          <td>${formatCurrency(project.thirtyDay.holderRevenue)}</td>
           <td>${formatCurrency(project.thirtyDay.buyback)}</td>
-          <td>${formatRatio(valuation.fdvToRevenue)}</td>
-          <td>${formatRatio(valuation.mcapToHolderRevenue)}</td>
-          <td>${formatCurrency(project.tvl)}</td>
-          <td>${formatRatio(valuation.fdvToTvl)}</td>
-          <td>${formatCurrency(project.unlocks?.next90dUsd)}</td>
+          <td>${formatPercent(getBuybackYield(project))}</td>
           <td>${renderBadge(unlockRisk.label, unlockRisk.type)}</td>
           <td>${escapeHtml(valueCaptureLabel(project.valueCaptureType))}</td>
+          <td>${formatCurrency(project.marketCap)}</td>
         </tr>
       `;
     })
