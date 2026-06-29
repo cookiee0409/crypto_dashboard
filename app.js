@@ -792,7 +792,7 @@ function createDualSeriesChart(primarySeries, secondarySeries, title) {
   if (!allValues.length) return `<div class="empty-chart">표시할 데이터가 없습니다.</div>`;
   const width = 920;
   const height = 310;
-  const padding = { top: 24, right: 26, bottom: 38, left: 56 };
+  const padding = { top: 24, right: 78, bottom: 44, left: 62 };
   const max = Math.max(...allValues, 1) * 1.14;
   const min = Math.min(...allValues, 0) * 0.92;
   const denominator = Math.max(primary.length - 1, 1);
@@ -801,24 +801,59 @@ function createDualSeriesChart(primarySeries, secondarySeries, title) {
   const toLine = (values) => values.map((value, index) => `${index === 0 ? "M" : "L"}${xScale(index)},${yScale(value)}`).join(" ");
   const toArea = (values) => `${toLine(values)} L${xScale(values.length - 1)},${height - padding.bottom} L${xScale(0)},${height - padding.bottom} Z`;
   const labelStep = Math.max(1, Math.floor(labels.length / 5));
+  const yTicks = [0, 0.25, 0.5, 0.75, 1].map((ratio) => min + (max - min) * ratio);
+  const barMax = Math.max(...secondary, 1);
+  const zoneWidth = (width - padding.left - padding.right) / denominator;
+  const summary = chartSummary(primarySeries);
 
   return `
-    <svg class="chart-svg analysis-chart" viewBox="0 0 ${width} ${height}" preserveAspectRatio="none" role="img" aria-label="${escapeHtml(title)}">
-      <title>${escapeHtml(title)}</title>
-      ${[0, 1, 2, 3, 4].map((item) => {
-        const y = padding.top + item * ((height - padding.top - padding.bottom) / 4);
-        return `<line class="chart-axis" x1="${padding.left}" y1="${y}" x2="${width - padding.right}" y2="${y}" />`;
-      }).join("")}
-      <path class="area-path revenue-area" d="${toArea(primary)}" />
-      <path class="area-path return-area" d="${toArea(secondary)}" />
-      <path class="line-path" d="${toLine(primary)}" />
-      <path class="line-path secondary" d="${toLine(secondary)}" />
-      ${primary.map((value, index) => index % labelStep === 0 || index === primary.length - 1 ? `
-        <text class="chart-label" x="${xScale(index)}" y="${height - 13}" text-anchor="middle">${escapeHtml(labels[index] || "")}</text>
-      ` : "").join("")}
-      ${primary.map((value, index) => index % labelStep === 0 || index === primary.length - 1 ? `<circle class="chart-dot" cx="${xScale(index)}" cy="${yScale(value)}" r="4" />` : "").join("")}
-      ${secondary.map((value, index) => index % labelStep === 0 || index === secondary.length - 1 ? `<circle class="chart-dot secondary" cx="${xScale(index)}" cy="${yScale(value)}" r="4" />` : "").join("")}
-    </svg>
+    <div class="financial-chart" data-chart-kind="dual">
+      <div class="chart-hover-tooltip" role="status"></div>
+      <div class="chart-top-readout">
+        <span>${escapeHtml(title)}</span>
+        <strong>${summary.change >= 0 ? "+" : ""}${formatPercent(summary.change)}</strong>
+      </div>
+      <svg class="chart-svg analysis-chart" viewBox="0 0 ${width} ${height}" preserveAspectRatio="none" role="img" aria-label="${escapeHtml(title)}">
+        <title>${escapeHtml(title)}</title>
+        ${yTicks.map((tick) => {
+          const y = yScale(tick);
+          return `
+            <line class="chart-axis" x1="${padding.left}" y1="${y}" x2="${width - padding.right}" y2="${y}" />
+            <text class="chart-y-label" x="${width - padding.right + 10}" y="${y + 4}">$${tick.toFixed(1)}M</text>
+          `;
+        }).join("")}
+        ${secondary.map((value, index) => {
+          const x = xScale(index) - Math.max(2, zoneWidth * 0.18);
+          const barHeight = Math.max(2, (value / barMax) * 46);
+          return `<rect class="chart-volume-bar" x="${x}" y="${height - padding.bottom - barHeight}" width="${Math.max(2, zoneWidth * 0.36)}" height="${barHeight}" rx="2" />`;
+        }).join("")}
+        <path class="area-path revenue-area" d="${toArea(primary)}" />
+        <path class="area-path return-area" d="${toArea(secondary)}" />
+        <path class="line-path" d="${toLine(primary)}" />
+        <path class="line-path secondary" d="${toLine(secondary)}" />
+        <line class="chart-crosshair" x1="${padding.left}" y1="${padding.top}" x2="${padding.left}" y2="${height - padding.bottom}" />
+        <circle class="chart-hover-marker primary" r="5" />
+        <circle class="chart-hover-marker secondary" r="5" />
+        ${primary.map((value, index) => index % labelStep === 0 || index === primary.length - 1 ? `
+          <text class="chart-label" x="${xScale(index)}" y="${height - 13}" text-anchor="middle">${escapeHtml(labels[index] || "")}</text>
+        ` : "").join("")}
+        ${primary.map((value, index) => `
+          <rect class="chart-hover-zone"
+            x="${Math.max(padding.left, xScale(index) - zoneWidth / 2)}"
+            y="${padding.top}"
+            width="${index === primary.length - 1 ? zoneWidth / 2 : zoneWidth}"
+            height="${height - padding.top - padding.bottom}"
+            data-x="${xScale(index)}"
+            data-y-primary="${yScale(value)}"
+            data-y-secondary="${yScale(secondary[index] || 0)}"
+            data-label="${escapeHtml(labels[index] || "")}"
+            data-primary-label="프로젝트 매출"
+            data-secondary-label="토큰 환원"
+            data-primary="${escapeHtml(formatCurrency(value * 1000000))}"
+            data-secondary="${escapeHtml(formatCurrency((secondary[index] || 0) * 1000000))}" />
+        `).join("")}
+      </svg>
+    </div>
   `;
 }
 
@@ -827,7 +862,7 @@ function createAreaSeriesChart(series, title) {
   if (!values.length) return `<div class="empty-chart">표시할 데이터가 없습니다.</div>`;
   const width = 920;
   const height = 360;
-  const padding = { top: 24, right: 26, bottom: 42, left: 58 };
+  const padding = { top: 24, right: 78, bottom: 46, left: 64 };
   const max = Math.max(...values, 1) * 1.16;
   const min = Math.min(...values, 0) * 0.9;
   const denominator = Math.max(values.length - 1, 1);
@@ -836,22 +871,53 @@ function createAreaSeriesChart(series, title) {
   const line = values.map((value, index) => `${index === 0 ? "M" : "L"}${xScale(index)},${yScale(value)}`).join(" ");
   const area = `${line} L${xScale(values.length - 1)},${height - padding.bottom} L${xScale(0)},${height - padding.bottom} Z`;
   const labelStep = Math.max(1, Math.floor(series.length / 6));
+  const yTicks = [0, 0.25, 0.5, 0.75, 1].map((ratio) => min + (max - min) * ratio);
+  const barMax = Math.max(...values, 1);
+  const zoneWidth = (width - padding.left - padding.right) / denominator;
+  const summary = chartSummary(series);
 
   return `
-    <svg class="chart-svg analysis-chart" viewBox="0 0 ${width} ${height}" preserveAspectRatio="none" role="img" aria-label="${escapeHtml(title)}">
-      <title>${escapeHtml(title)}</title>
-      ${[0, 1, 2, 3, 4].map((item) => {
-        const y = padding.top + item * ((height - padding.top - padding.bottom) / 4);
-        return `<line class="chart-axis" x1="${padding.left}" y1="${y}" x2="${width - padding.right}" y2="${y}" />`;
-      }).join("")}
-      <path class="area-path return-area" d="${area}" />
-      <path class="line-path secondary" d="${line}" />
-      ${values.map((value, index) => index % labelStep === 0 || index === values.length - 1 ? `
-        <circle class="chart-dot secondary" cx="${xScale(index)}" cy="${yScale(value)}" r="4" />
-        <text class="chart-label" x="${xScale(index)}" y="${height - 14}" text-anchor="middle">${escapeHtml(series[index]?.label || "")}</text>
-        <text class="chart-label" x="${xScale(index)}" y="${yScale(value) - 10}" text-anchor="middle">$${value.toFixed(2)}M</text>
-      ` : "").join("")}
-    </svg>
+    <div class="financial-chart" data-chart-kind="single">
+      <div class="chart-hover-tooltip" role="status"></div>
+      <div class="chart-top-readout">
+        <span>${escapeHtml(title)}</span>
+        <strong>${summary.change >= 0 ? "+" : ""}${formatPercent(summary.change)}</strong>
+      </div>
+      <svg class="chart-svg analysis-chart" viewBox="0 0 ${width} ${height}" preserveAspectRatio="none" role="img" aria-label="${escapeHtml(title)}">
+        <title>${escapeHtml(title)}</title>
+        ${yTicks.map((tick) => {
+          const y = yScale(tick);
+          return `
+            <line class="chart-axis" x1="${padding.left}" y1="${y}" x2="${width - padding.right}" y2="${y}" />
+            <text class="chart-y-label" x="${width - padding.right + 10}" y="${y + 4}">$${tick.toFixed(2)}M</text>
+          `;
+        }).join("")}
+        ${values.map((value, index) => {
+          const x = xScale(index) - Math.max(2, zoneWidth * 0.16);
+          const barHeight = Math.max(2, (value / barMax) * 56);
+          return `<rect class="chart-volume-bar" x="${x}" y="${height - padding.bottom - barHeight}" width="${Math.max(2, zoneWidth * 0.32)}" height="${barHeight}" rx="2" />`;
+        }).join("")}
+        <path class="area-path return-area" d="${area}" />
+        <path class="line-path secondary" d="${line}" />
+        <line class="chart-crosshair" x1="${padding.left}" y1="${padding.top}" x2="${padding.left}" y2="${height - padding.bottom}" />
+        <circle class="chart-hover-marker secondary" r="5" />
+        ${values.map((value, index) => index % labelStep === 0 || index === values.length - 1 ? `
+          <text class="chart-label" x="${xScale(index)}" y="${height - 14}" text-anchor="middle">${escapeHtml(series[index]?.label || "")}</text>
+        ` : "").join("")}
+        ${values.map((value, index) => `
+          <rect class="chart-hover-zone"
+            x="${Math.max(padding.left, xScale(index) - zoneWidth / 2)}"
+            y="${padding.top}"
+            width="${index === values.length - 1 ? zoneWidth / 2 : zoneWidth}"
+            height="${height - padding.top - padding.bottom}"
+            data-x="${xScale(index)}"
+            data-y-secondary="${yScale(value)}"
+            data-label="${escapeHtml(series[index]?.label || "")}"
+            data-secondary-label="토큰 환원"
+            data-secondary="${escapeHtml(formatCurrency(value * 1000000))}" />
+        `).join("")}
+      </svg>
+    </div>
   `;
 }
 
@@ -1342,6 +1408,63 @@ function bindChartControls() {
       state.buybackInterval = button.dataset.value;
       renderCharts(getSelectedProject());
       bindChartControls();
+    });
+  });
+  bindFinancialChartInteractions();
+}
+
+function bindFinancialChartInteractions() {
+  $$(".financial-chart").forEach((chart) => {
+    const tooltip = chart.querySelector(".chart-hover-tooltip");
+    const svg = chart.querySelector("svg");
+    const crosshair = chart.querySelector(".chart-crosshair");
+    const primaryMarker = chart.querySelector(".chart-hover-marker.primary");
+    const secondaryMarker = chart.querySelector(".chart-hover-marker.secondary");
+    const zones = chart.querySelectorAll(".chart-hover-zone");
+
+    const hide = () => {
+      chart.classList.remove("hovering");
+      if (tooltip) tooltip.classList.remove("visible");
+    };
+
+    zones.forEach((zone) => {
+      const show = () => {
+        const x = Number(zone.dataset.x) || 0;
+        const yPrimary = Number(zone.dataset.yPrimary) || 0;
+        const ySecondary = Number(zone.dataset.ySecondary) || 0;
+        chart.classList.add("hovering");
+        if (crosshair) {
+          crosshair.setAttribute("x1", String(x));
+          crosshair.setAttribute("x2", String(x));
+        }
+        if (primaryMarker && yPrimary) {
+          primaryMarker.setAttribute("cx", String(x));
+          primaryMarker.setAttribute("cy", String(yPrimary));
+        }
+        if (secondaryMarker && ySecondary) {
+          secondaryMarker.setAttribute("cx", String(x));
+          secondaryMarker.setAttribute("cy", String(ySecondary));
+        }
+        if (tooltip && svg) {
+          const rect = svg.getBoundingClientRect();
+          const box = chart.getBoundingClientRect();
+          const viewBox = svg.viewBox.baseVal;
+          const left = ((x - viewBox.x) / viewBox.width) * rect.width + rect.left - box.left;
+          tooltip.style.left = `${Math.min(Math.max(left + 10, 12), Math.max(12, box.width - 190))}px`;
+          tooltip.innerHTML = `
+            <strong>${escapeHtml(zone.dataset.label || "-")}</strong>
+            ${zone.dataset.primary ? `<span><i class="revenue"></i>${escapeHtml(zone.dataset.primaryLabel || "매출")} <b>${escapeHtml(zone.dataset.primary)}</b></span>` : ""}
+            <span><i class="return"></i>${escapeHtml(zone.dataset.secondaryLabel || "토큰 환원")} <b>${escapeHtml(zone.dataset.secondary || "-")}</b></span>
+          `;
+          tooltip.classList.add("visible");
+        }
+      };
+      zone.addEventListener("mouseenter", show);
+      zone.addEventListener("mousemove", show);
+      zone.addEventListener("mouseleave", hide);
+      zone.addEventListener("focus", show);
+      zone.addEventListener("blur", hide);
+      zone.setAttribute("tabindex", "0");
     });
   });
 }
