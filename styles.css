@@ -36,6 +36,16 @@
   --cl-shadow:   0 1px 3px rgba(12,27,21,.06);
 }
 
+/* ---------- reset & essentials (필수) ---------- */
+*, *::before, *::after { box-sizing: border-box; }
+* { margin: 0; padding: 0; }
+.hidden { display: none !important; }
+a { color: inherit; text-decoration: none; }
+button { font-family: inherit; }
+img, svg { display: block; max-width: 100%; }
+ul, ol { list-style: none; }
+h1, h2, h3, h4 { font-weight: 700; }
+
 /* ---------- base ---------- */
 body {
   background: var(--cl-bg);
