@@ -1,36 +1,61 @@
 /* ============================================================
-   CryptoLens — 에메랄드 강조 오버라이드
+   CryptoLens — 에메랄드 + 시안(Pretendard) 폴리시 오버라이드
    ★ 원본 styles.css 를 그대로 두고, 그 "뒤에" 추가 로드하세요.
      index.html <head>:
        <link rel="stylesheet" href="./styles.css" />
-       <link rel="stylesheet" href="./cryptolens-theme.css" />   <!-- 이 줄을 styles.css 다음에 -->
-   원본은 이미 라이트 테마(파란 강조)입니다. 이 파일은 강조색만
-   에메랄드로 바꾸며 레이아웃 규칙은 건드리지 않습니다.
+       <link rel="stylesheet" href="./cryptolens-theme.css" />   <!-- styles.css 다음 줄 -->
+   색만이 아니라 폰트·막대차트·카드 디테일까지 시안 수준으로 끌어올립니다.
+   레이아웃 그리드는 원본 유지 → 깨지지 않습니다.
    ============================================================ */
 
-/* 토큰 재정의 — 맨 뒤에 선언되어 원본 :root 를 이깁니다 */
+@import url("https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard.css");
+
+/* ---------- 토큰 재정의 (맨 뒤 선언 → 원본 :root 를 이김) ---------- */
 :root {
-  --green: #0e9f6e;   /* 1차 강조 (수익·환원·점수) */
-  --blue:  #0e8aa0;   /* 2차 라인 (수익률 등) — 에메랄드와 어울리는 틸 */
-  --shadow: 0 14px 34px rgba(15, 23, 42, 0.07);
+  --green: #0e9f6e;   /* 1차 강조 */
+  --blue:  #0e8aa0;   /* 2차 라인 (에메랄드와 어울리는 틸) */
+  --line:  #e6ece9;
+  --line-soft: rgba(22, 40, 33, 0.10);
+  --text:  #0c1b15;
+  --muted: #5b6b64;
+  --muted-2: #9aa8a2;
+  --radius: 18px;
+  --radius-sm: 11px;
+  --shadow: 0 1px 3px rgba(12, 27, 21, 0.06);
 }
 
-/* 배경을 살짝 더 뉴트럴하게 */
+/* ---------- 폰트: Pretendard + 숫자 정렬 ---------- */
 html, body { background: #f2f5f4; }
-body { background: linear-gradient(180deg, #f7faf9 0%, #f1f5f3 100%); }
+body {
+  font-family: Pretendard, -apple-system, BlinkMacSystemFont, "Segoe UI", "Noto Sans KR", sans-serif;
+  color: var(--text);
+  background: linear-gradient(180deg, #f7faf9 0%, #f1f5f3 100%);
+  -webkit-font-smoothing: antialiased;
+}
+.summary-card .value,
+.metric-item strong,
+.simple-bar strong,
+table, .score-ring, .projection-box h3, .definition-grid b,
+.dashboard-kpi-row strong, .score-summary strong, .unlock-summary strong {
+  font-variant-numeric: tabular-nums;
+  font-feature-settings: "tnum" 1;
+}
 
-/* ---- 1차 액션: 파란 버튼 → 에메랄드 ---- */
+/* ---------- 1차 액션: 파란 버튼 → 에메랄드 ---------- */
 .ghost-button {
   color: #ffffff;
   border-color: #0c8a60;
   background: #0e9f6e;
 }
-.ghost-button:hover {
-  border-color: #0b7d57;
-  background: #0c8f64;
+.ghost-button:hover { border-color: #0b7d57; background: #0c8f64; }
+.ghost-button.small {
+  color: var(--text);
+  border-color: var(--line);
+  background: #f2f5f4;
 }
+.ghost-button.small:hover { background: #ffffff; border-color: #cfe6db; }
 
-/* ---- 탭 / 칩 활성 상태: 파랑 → 에메랄드 틴트 ---- */
+/* ---------- 탭 / 칩 활성: 파랑 → 에메랄드 틴트 ---------- */
 .tab.active,
 .category-button.active,
 .chip.active {
@@ -40,7 +65,11 @@ body { background: linear-gradient(180deg, #f7faf9 0%, #f1f5f3 100%); }
 }
 .segment.active { background: #0e9f6e; }
 
-/* ---- 요약 카드 hover/active 강조 ---- */
+/* ---------- 카드/패널 디테일 ---------- */
+.summary-card, .panel {
+  border-color: var(--line);
+  border-radius: var(--radius);
+}
 .summary-card.clickable:hover,
 .summary-card.clickable:focus-visible {
   border-color: #9fdcc6;
@@ -53,7 +82,7 @@ body { background: linear-gradient(180deg, #f7faf9 0%, #f1f5f3 100%); }
   box-shadow: 0 18px 42px rgba(14, 159, 110, 0.16);
 }
 
-/* ---- 표 / 행 hover, 선택 강조 ---- */
+/* ---------- 표 / 행 hover, 선택 강조 ---------- */
 .summary-rank-row:hover,
 tbody tr:hover { background: #f2faf7; }
 .summary-rank-row:focus-visible,
@@ -65,34 +94,72 @@ tbody tr:hover { background: #f2faf7; }
   background: color-mix(in srgb, #0e9f6e 10%, transparent);
 }
 
-/* ---- 프로젝트 카드 선택 ---- */
+/* ---------- 프로젝트 카드 선택 ---------- */
 .project-card:hover,
-.project-card.active {
-  border-color: #9fdcc6;
-  background: #e7f6ef;
-}
+.project-card.active { border-color: #9fdcc6; background: #e7f6ef; }
 
-/* ---- 대시보드 헤더의 파란 보조 텍스트/링크 → 에메랄드 ---- */
+/* ---------- 대시보드 헤더의 파란 보조 텍스트/링크 → 에메랄드 ---------- */
 #dashboardTab .project-title-copy small,
 #dashboardTab .source-links a,
 .detail-source-block a,
 .project-section-tabs a.active { color: #0e9f6e; }
 .project-section-tabs a.active::after { background: #0e9f6e; }
 
-/* ---- KPI 미터(파랑 변형)도 에메랄드 계열로 통일 ---- */
+/* ---------- KPI 미터(파랑 변형) 통일 ---------- */
 .kpi-meter.blue {
   background:
     radial-gradient(circle at center, #ffffff 0 57%, transparent 58%),
     conic-gradient(var(--blue) calc(var(--score) * 1%), #e4e9f1 0);
 }
 
-/* ---- verdict 박스: 파란 톤 → 에메랄드 톤 ---- */
+/* ---------- verdict 박스: 파란 톤 → 에메랄드 톤 ---------- */
 .verdict {
   border-color: rgba(14, 159, 110, 0.24);
   background: rgba(14, 159, 110, 0.10);
 }
 
+/* ============================================================
+   월별 토큰 환원 막대차트 (.simple-bar-chart) — 시안 수준 정돈
+   원본: 6칸 그리드, 막대가 거의 꽉 차 답답. 간격·폭·라운드 조정.
+   ============================================================ */
+.simple-bar-chart {
+  gap: 18px;
+  height: 210px;
+  padding-top: 24px;
+}
+.simple-bar {
+  grid-template-rows: 24px 1fr 22px;
+  gap: 10px;
+}
+.simple-bar strong {
+  color: var(--text);
+  font-size: 13px;
+  font-weight: 700;
+}
+.simple-bar i {
+  width: 72%;
+  margin: 0 auto;
+  max-width: 56px;
+  border-radius: 8px 8px 4px 4px;
+  background: linear-gradient(180deg, #12b07e 0%, #0e9f6e 100%);
+}
+.simple-bar:last-child i {
+  background: linear-gradient(180deg, #0e9f6e 0%, #047857 100%);
+}
+.simple-bar span { color: var(--muted-2); font-size: 11px; }
+
+/* ---------- 차트 면적/라인 (토큰 자동 반영 + 부드러운 fill) ---------- */
+.revenue-area { fill: rgba(14, 159, 110, 0.12); }
+.area-path { fill: rgba(14, 159, 110, 0.12); }
+.return-area { fill: rgba(14, 138, 160, 0.10); }
+
+/* ---------- return-explainer 강조선도 에메랄드 ---------- */
+.return-explainer {
+  border-color: rgba(14, 159, 110, 0.18);
+  background: #f3fbf8;
+}
+.return-explainer strong { color: #0e9f6e; }
+
 /* 비고:
-   - 차트의 면적/라인 fill 은 원본이 var(--green)/var(--blue) 토큰을 쓰므로
-     위 토큰 재정의만으로 자동 반영됩니다. (검게 나오던 건 예전 교체 파일 탓)
-   - 도넛의 커뮤니티 보라(#8b5cf6)·언락 빨강 등 의미색은 그대로 둡니다. */
+   - 의미색(언락 빨강, 도넛 커뮤니티 보라)은 의도적으로 유지.
+   - 레이아웃 그리드/배치는 원본 유지 → 깨짐 없음. */
