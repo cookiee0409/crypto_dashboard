@@ -55,6 +55,16 @@ function formatCurrency(value, compact = true) {
   }).format(Number(value));
 }
 
+function formatWholeCurrency(value) {
+  if (value === null || value === undefined || Number.isNaN(Number(value))) return "-";
+  return new Intl.NumberFormat("en-US", {
+    style: "currency",
+    currency: "USD",
+    notation: "standard",
+    maximumFractionDigits: 0,
+  }).format(Number(value));
+}
+
 function formatNumber(value, digits = 0) {
   if (value === null || value === undefined || Number.isNaN(Number(value))) return "-";
   return new Intl.NumberFormat("en-US", { maximumFractionDigits: digits }).format(Number(value));
@@ -436,7 +446,7 @@ function smoothPath(points) {
   return d;
 }
 
-function areaChart(values, labels, { color = "#16a34a", title = "", unit = "M", fmt, interactive = false, chartId = "" } = {}) {
+function areaChart(values, labels, { color = "#16a34a", title = "", unit = "M", fmt, tooltipFmt, interactive = false, chartId = "" } = {}) {
   const clean = values.map((v) => Number(v) || 0);
   if (!clean.length) return `<div class="card-sub">표시할 데이터가 없습니다.</div>`;
   const width = 560;
@@ -477,7 +487,7 @@ function areaChart(values, labels, { color = "#16a34a", title = "", unit = "M", 
       `).join("")}
       ${points.map((p, i) => {
         const label = labels[i] || "";
-        const display = formatY(clean[i]);
+        const display = tooltipFmt ? tooltipFmt(clean[i], i) : formatY(clean[i]);
         const x = i === 0 ? pad.left : p[0] - hitWidth / 2;
         const w = i === points.length - 1 ? width - pad.right - x : hitWidth;
         return `
@@ -537,12 +547,12 @@ function stackedAreaChart(cohorts, axisLabels, { title = "", interactive = false
       <line class="chart-crosshair" x1="${xScale(n - 1)}" y1="${pad.top}" x2="${xScale(n - 1)}" y2="${height - pad.bottom}" />
       ${axisLabels.map((label, i) => {
         const total = totals[i] || 0;
-        const lines = cohorts.map((cohort) => `${cohort.label}: ${formatPercent((Number(cohort.values[i]) || 0) / Math.max(total, 1), 0)}`).join(" | ");
+        const lines = cohorts.map((cohort) => `${cohort.label}: ${formatPercent((Number(cohort.values[i]) || 0) / Math.max(total, 1), 1)}`).join(" | ");
         const x = i === 0 ? pad.left : xScale(i) - hitWidth / 2;
         const w = i === n - 1 ? width - pad.right - x : hitWidth;
         return `
           <circle class="chart-point" data-chart-point="${i}" cx="${xScale(i)}" cy="${yScale(total)}" r="3.2" fill="#15294a" />
-          <rect class="chart-hit" data-chart-index="${i}" data-x="${xScale(i)}" data-y="${yScale(total)}" data-label="${escapeHtml(label)}" data-display="${formatPercent(total, 0)} 유통" data-lines="${escapeHtml(lines)}" x="${x}" y="${pad.top}" width="${Math.max(w, 12)}" height="${height - pad.top - pad.bottom}" />
+          <rect class="chart-hit" data-chart-index="${i}" data-x="${xScale(i)}" data-y="${yScale(total)}" data-label="${escapeHtml(label)}" data-display="${formatPercent(total, 1)} 유통" data-lines="${escapeHtml(lines)}" x="${x}" y="${pad.top}" width="${Math.max(w, 12)}" height="${height - pad.top - pad.bottom}" />
         `;
       }).join("")}
       ${axisLabels.map((lbl, i) => (i % labelStep === 0 || i === n - 1)
@@ -552,7 +562,7 @@ function stackedAreaChart(cohorts, axisLabels, { title = "", interactive = false
   `;
 }
 
-function svgDonut(segments, { size = 150, centerLabel = "합계", centerValue = "" } = {}) {
+function svgDonut(segments, { size = 150, centerLabel = "합계", centerValue = "", centerSub = "" } = {}) {
   // segments: [{ value, color }]
   const total = segments.reduce((s, x) => s + (Number(x.value) || 0), 0) || 1;
   const r = size / 2;
@@ -575,14 +585,15 @@ function svgDonut(segments, { size = 150, centerLabel = "합계", centerValue = 
     const xi1 = cx + inner * Math.cos(start);
     const yi1 = cy + inner * Math.sin(start);
     return `
-      <path class="donut-segment" data-donut-index="${index}" data-label="${escapeHtml(seg.label || "")}" data-display="${escapeHtml(seg.display || formatPercent(frac, 0))}" d="M${x1},${y1} A${r},${r} 0 ${large} 1 ${x2},${y2} L${xi2},${yi2} A${inner},${inner} 0 ${large} 0 ${xi1},${yi1} Z" fill="${seg.color}" />
+      <path class="donut-segment" data-donut-index="${index}" data-label="${escapeHtml(seg.label || "")}" data-display="${escapeHtml(seg.display || formatPercent(frac, 1))}" data-sub="${escapeHtml(seg.sub || "")}" d="M${x1},${y1} A${r},${r} 0 ${large} 1 ${x2},${y2} L${xi2},${yi2} A${inner},${inner} 0 ${large} 0 ${xi1},${yi1} Z" fill="${seg.color}" />
     `;
   }).join("");
   return `
-    <svg class="donut interactive-donut" data-center-label="${escapeHtml(centerLabel)}" data-center-value="${escapeHtml(centerValue)}" viewBox="0 0 ${size} ${size}" role="img" aria-label="구성 도넛 차트">
+    <svg class="donut interactive-donut" data-center-label="${escapeHtml(centerLabel)}" data-center-value="${escapeHtml(centerValue)}" data-center-sub="${escapeHtml(centerSub)}" viewBox="0 0 ${size} ${size}" role="img" aria-label="구성 도넛 차트">
       ${arcs}
-      <text class="donut-center-title" x="${cx}" y="${cy - 5}" text-anchor="middle">${escapeHtml(centerLabel)}</text>
-      <text class="donut-center-value" x="${cx}" y="${cy + 13}" text-anchor="middle">${escapeHtml(centerValue)}</text>
+      <text class="donut-center-title" x="${cx}" y="${cy - 13}" text-anchor="middle">${escapeHtml(centerLabel)}</text>
+      <text class="donut-center-value" x="${cx}" y="${cy + 4}" text-anchor="middle">${escapeHtml(centerValue)}</text>
+      <text class="donut-center-sub" x="${cx}" y="${cy + 19}" text-anchor="middle">${escapeHtml(centerSub)}</text>
     </svg>
   `;
 }
@@ -781,7 +792,16 @@ function renderHome() {
             <div><p class="card-title">섹터 구성</p><p class="card-sub">시가총액 기준 카테고리 비중</p></div>
           </div>
           <div class="donut-card">
-            ${svgDonut(sectors.map((s) => ({ value: s.cap, color: s.color, label: s.cat, display: `${formatPercent(s.pct, 0)} · ${formatCurrency(s.cap)}` })), { centerLabel: "전체", centerValue: formatCurrency(catTotal) })}
+            ${svgDonut(
+              sectors.map((s) => ({
+                value: s.cap,
+                color: s.color,
+                label: s.cat,
+                display: formatWholeCurrency(s.cap),
+                sub: formatPercent(s.pct, 1),
+              })),
+              { centerLabel: "전체", centerValue: formatWholeCurrency(catTotal), centerSub: "100.0%" },
+            )}
             <div class="donut-legend">
               ${sectors.map((s) => `
                 <div class="leg">
@@ -936,7 +956,7 @@ function renderAnalysis() {
             <tbody>${revRows}</tbody>
           </table>
           <div class="chart-pad">
-            ${areaChart(revenueSeries.values, revenueSeries.labels, { color: "#16a34a", title: `${project.name} 월별 매출`, interactive: true, chartId: "revenue" })}
+            ${areaChart(revenueSeries.values, revenueSeries.labels, { color: "#16a34a", title: `${project.name} 월별 매출`, tooltipFmt: (v) => formatWholeCurrency(v * 1000000), interactive: true, chartId: "revenue" })}
           </div>
         </div>
       </div>
@@ -1247,10 +1267,12 @@ function bindDonuts() {
   $$(".interactive-donut").forEach((svg) => {
     const title = svg.querySelector(".donut-center-title");
     const value = svg.querySelector(".donut-center-value");
+    const sub = svg.querySelector(".donut-center-sub");
     const reset = () => {
       svg.querySelectorAll(".donut-segment").forEach((segment) => segment.classList.remove("active"));
       if (title) title.textContent = svg.dataset.centerLabel || "";
       if (value) value.textContent = svg.dataset.centerValue || "";
+      if (sub) sub.textContent = svg.dataset.centerSub || "";
     };
 
     svg.querySelectorAll(".donut-segment").forEach((segment) => {
@@ -1259,6 +1281,7 @@ function bindDonuts() {
         segment.classList.add("active");
         if (title) title.textContent = segment.dataset.label || "";
         if (value) value.textContent = segment.dataset.display || "";
+        if (sub) sub.textContent = segment.dataset.sub || "";
       });
     });
     svg.addEventListener("pointerleave", reset);
