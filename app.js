@@ -28,6 +28,7 @@ const state = {
   search: "",
   activeTab: "홈",
   rankSort: "revenue",
+  revenueRange: "6M",
   isRefreshing: false,
   status: "샘플 데이터 표시 중 · 데이터 새로고침을 누르면 공개 API 연동을 시도합니다.",
 };
@@ -307,6 +308,113 @@ function rankBadge(index) {
   return `<span class="rank-badge${index === 0 ? " gold" : ""}">${index + 1}</span>`;
 }
 
+function clampNumber(value, min, max) {
+  return Math.min(max, Math.max(min, Number(value) || 0));
+}
+
+function monthLabelsFor(values = []) {
+  if (values.length <= months.length) return months.slice(0, values.length);
+  return values.map((_, index) => `${index + 1}`);
+}
+
+function sliceSeries(values = [], labels = [], range = "6M") {
+  const size = range === "3M" ? 3 : range === "6M" ? 6 : values.length;
+  const start = Math.max(values.length - size, 0);
+  return {
+    values: values.slice(start),
+    labels: labels.slice(start),
+    start,
+  };
+}
+
+function aggregateMonthly(key) {
+  const length = Math.max(...projects.map((p) => p[key]?.length || 0), 0);
+  return Array.from({ length }, (_, index) => projects.reduce((sum, project) => sum + (Number(project[key]?.[index]) || 0), 0));
+}
+
+function sparkline(values = [], { color = "#2f6bd8", title = "", width = 128, height = 34 } = {}) {
+  const clean = values.map((value) => Number(value) || 0);
+  if (!clean.length) return "";
+  const max = Math.max(...clean, 1);
+  const min = Math.min(...clean, 0);
+  const pad = 4;
+  const denom = Math.max(clean.length - 1, 1);
+  const xScale = (index) => pad + (index / denom) * (width - pad * 2);
+  const yScale = (value) => height - pad - ((value - min) / Math.max(max - min, 1)) * (height - pad * 2);
+  const points = clean.map((value, index) => [xScale(index), yScale(value)]);
+  const path = smoothPath(points);
+  return `
+    <svg class="sparkline" viewBox="0 0 ${width} ${height}" role="img" aria-label="${escapeHtml(title)}">
+      <title>${escapeHtml(title)}</title>
+      <path class="sparkline-line" d="${path}" stroke="${color}" />
+      <circle class="sparkline-dot" cx="${points.at(-1)[0]}" cy="${points.at(-1)[1]}" r="2.4" fill="${color}" />
+    </svg>
+  `;
+}
+
+function metricBar(value, max, content, { tone = "blue" } = {}) {
+  const pct = max > 0 ? clampNumber((Number(value) / max) * 100, 2, 100) : 0;
+  return `<span class="metric-bar ${tone}" style="--bar:${pct}%"><span>${content}</span></span>`;
+}
+
+function revenueReturnChart(items) {
+  const top = [...items].sort((a, b) => (Number(b.thirtyDay?.revenue) || 0) - (Number(a.thirtyDay?.revenue) || 0)).slice(0, 4);
+  const maxRevenue = Math.max(...top.map((p) => Number(p.thirtyDay?.revenue) || 0), 1);
+  return `
+    <div class="compare-bars">
+      ${top.map((project) => {
+        const revenue = Number(project.thirtyDay?.revenue) || 0;
+        const returned = Number(project.thirtyDay?.buyback) || 0;
+        const revenuePct = clampNumber((revenue / maxRevenue) * 100, 3, 100);
+        const returnedPct = clampNumber((returned / maxRevenue) * 100, 0, 100);
+        return `
+          <button class="compare-row" type="button" data-open-project="${escapeHtml(project.id)}">
+            <span class="compare-name">${escapeHtml(project.name)}</span>
+            <span class="compare-track">
+              <span class="compare-fill revenue" style="width:${revenuePct}%"></span>
+              <span class="compare-fill returned" style="width:${returnedPct}%"></span>
+            </span>
+            <span class="compare-values">
+              <b>${formatCurrency(revenue)}</b>
+              <small>환원 ${formatPercent(returned / Math.max(revenue, 1), 0)}</small>
+            </span>
+          </button>
+        `;
+      }).join("")}
+    </div>
+  `;
+}
+
+function unlockTimeline(rows = []) {
+  if (!rows.length) return `<div class="timeline-empty">표시할 언락 일정이 없습니다.</div>`;
+  const start = new Date(todayStr());
+  const end = new Date(start);
+  end.setMonth(end.getMonth() + 12);
+  const span = Math.max(end - start, 1);
+  const maxUsd = Math.max(...rows.map((row) => Number(row.usd) || 0), 1);
+  return `
+    <div class="unlock-timeline" aria-label="12개월 언락 타임라인">
+      <div class="timeline-axis">
+        <span>현재</span>
+        <span>+6M</span>
+        <span>+12M</span>
+      </div>
+      <div class="timeline-track">
+        ${rows.map((row) => {
+          const date = new Date(row.date);
+          const left = Number.isNaN(date.getTime()) ? 0 : clampNumber(((date - start) / span) * 100, 0, 100);
+          const size = 12 + Math.sqrt((Number(row.usd) || 0) / maxUsd) * 22;
+          return `
+            <span class="timeline-bubble" style="left:${left}%; width:${size}px; height:${size}px; background:${row.cohortColor}" title="${escapeHtml(row.date)} · ${escapeHtml(row.cohortLabel)} · ${formatCurrency(row.usd)}">
+              <span class="timeline-tip">${escapeHtml(row.date)}<b>${formatCurrency(row.usd)}</b></span>
+            </span>
+          `;
+        }).join("")}
+      </div>
+    </div>
+  `;
+}
+
 /* ============================================================
    SVG CHARTS (hand-rolled, width-constrained)
    ============================================================ */
@@ -328,7 +436,7 @@ function smoothPath(points) {
   return d;
 }
 
-function areaChart(values, labels, { color = "#16a34a", title = "", unit = "M", fmt } = {}) {
+function areaChart(values, labels, { color = "#16a34a", title = "", unit = "M", fmt, interactive = false, chartId = "" } = {}) {
   const clean = values.map((v) => Number(v) || 0);
   if (!clean.length) return `<div class="card-sub">표시할 데이터가 없습니다.</div>`;
   const width = 560;
@@ -345,9 +453,10 @@ function areaChart(values, labels, { color = "#16a34a", title = "", unit = "M", 
   const gid = `grad-${Math.random().toString(36).slice(2, 8)}`;
   const yTicks = [0, 0.5, 1].map((r) => min + (max - min) * r);
   const formatY = fmt || ((v) => `$${v.toFixed(1)}${unit}`);
+  const hitWidth = (width - pad.left - pad.right) / Math.max(clean.length - 1, 1);
 
   return `
-    <svg class="chart-svg" viewBox="0 0 ${width} ${height}" role="img" aria-label="${escapeHtml(title)}">
+    <svg class="chart-svg${interactive ? " interactive-chart" : ""}" data-chart-id="${escapeHtml(chartId)}" viewBox="0 0 ${width} ${height}" role="img" aria-label="${escapeHtml(title)}">
       <title>${escapeHtml(title)}</title>
       <defs>
         <linearGradient id="${gid}" x1="0" x2="0" y1="0" y2="1">
@@ -362,13 +471,25 @@ function areaChart(values, labels, { color = "#16a34a", title = "", unit = "M", 
       }).join("")}
       <path d="${area}" fill="url(#${gid})" />
       <path class="area-line" d="${line}" stroke="${color}" />
-      <circle class="end-dot" cx="${points.at(-1)[0]}" cy="${points.at(-1)[1]}" r="4.5" fill="${color}" />
+      <line class="chart-crosshair" x1="${points.at(-1)[0]}" y1="${pad.top}" x2="${points.at(-1)[0]}" y2="${height - pad.bottom}" />
+      ${points.map((p, i) => `
+        <circle class="chart-point${i === points.length - 1 ? " end-dot" : ""}" data-chart-point="${i}" cx="${p[0]}" cy="${p[1]}" r="${i === points.length - 1 ? 4.5 : 3.2}" fill="${color}" />
+      `).join("")}
+      ${points.map((p, i) => {
+        const label = labels[i] || "";
+        const display = formatY(clean[i]);
+        const x = i === 0 ? pad.left : p[0] - hitWidth / 2;
+        const w = i === points.length - 1 ? width - pad.right - x : hitWidth;
+        return `
+          <rect class="chart-hit" data-chart-index="${i}" data-x="${p[0]}" data-y="${p[1]}" data-label="${escapeHtml(label)}" data-display="${escapeHtml(display)}" x="${x}" y="${pad.top}" width="${Math.max(w, 14)}" height="${height - pad.top - pad.bottom}" />
+        `;
+      }).join("")}
       ${points.map((p, i) => `<text class="axis-label" x="${p[0]}" y="${height - 10}" text-anchor="middle">${escapeHtml(labels[i] || "")}</text>`).join("")}
     </svg>
   `;
 }
 
-function stackedAreaChart(cohorts, axisLabels, { title = "" } = {}) {
+function stackedAreaChart(cohorts, axisLabels, { title = "", interactive = false, chartId = "" } = {}) {
   // cohorts: [{ label, color, values:[...] }] all same length; stacked cumulatively.
   const n = axisLabels.length;
   if (!n || !cohorts.length) return `<div class="card-sub">표시할 데이터가 없습니다.</div>`;
@@ -392,6 +513,7 @@ function stackedAreaChart(cohorts, axisLabels, { title = "" } = {}) {
   }
 
   const yTicks = [0, 0.5, 1].map((r) => max * r);
+  const hitWidth = (width - pad.left - pad.right) / Math.max(n - 1, 1);
 
   const bandPaths = bands.map(({ cohort, lower, upper }) => {
     const top = upper.map((v, i) => [xScale(i), yScale(v)]);
@@ -404,7 +526,7 @@ function stackedAreaChart(cohorts, axisLabels, { title = "" } = {}) {
   const labelStep = Math.max(1, Math.ceil(n / 7));
 
   return `
-    <svg class="chart-svg" viewBox="0 0 ${width} ${height}" role="img" aria-label="${escapeHtml(title)}">
+    <svg class="chart-svg${interactive ? " interactive-chart" : ""}" data-chart-id="${escapeHtml(chartId)}" viewBox="0 0 ${width} ${height}" role="img" aria-label="${escapeHtml(title)}">
       <title>${escapeHtml(title)}</title>
       ${yTicks.map((t) => {
         const y = yScale(t);
@@ -412,6 +534,17 @@ function stackedAreaChart(cohorts, axisLabels, { title = "" } = {}) {
           <text class="axis-label" x="${pad.left - 8}" y="${y + 3}" text-anchor="end">${(t * 100).toFixed(0)}%</text>`;
       }).join("")}
       ${bandPaths}
+      <line class="chart-crosshair" x1="${xScale(n - 1)}" y1="${pad.top}" x2="${xScale(n - 1)}" y2="${height - pad.bottom}" />
+      ${axisLabels.map((label, i) => {
+        const total = totals[i] || 0;
+        const lines = cohorts.map((cohort) => `${cohort.label}: ${formatPercent((Number(cohort.values[i]) || 0) / Math.max(total, 1), 0)}`).join(" | ");
+        const x = i === 0 ? pad.left : xScale(i) - hitWidth / 2;
+        const w = i === n - 1 ? width - pad.right - x : hitWidth;
+        return `
+          <circle class="chart-point" data-chart-point="${i}" cx="${xScale(i)}" cy="${yScale(total)}" r="3.2" fill="#15294a" />
+          <rect class="chart-hit" data-chart-index="${i}" data-x="${xScale(i)}" data-y="${yScale(total)}" data-label="${escapeHtml(label)}" data-display="${formatPercent(total, 0)} 유통" data-lines="${escapeHtml(lines)}" x="${x}" y="${pad.top}" width="${Math.max(w, 12)}" height="${height - pad.top - pad.bottom}" />
+        `;
+      }).join("")}
       ${axisLabels.map((lbl, i) => (i % labelStep === 0 || i === n - 1)
         ? `<text class="axis-label" x="${xScale(i)}" y="${height - 10}" text-anchor="middle">${escapeHtml(lbl)}</text>`
         : "").join("")}
@@ -419,7 +552,7 @@ function stackedAreaChart(cohorts, axisLabels, { title = "" } = {}) {
   `;
 }
 
-function svgDonut(segments, { size = 150 } = {}) {
+function svgDonut(segments, { size = 150, centerLabel = "합계", centerValue = "" } = {}) {
   // segments: [{ value, color }]
   const total = segments.reduce((s, x) => s + (Number(x.value) || 0), 0) || 1;
   const r = size / 2;
@@ -427,7 +560,7 @@ function svgDonut(segments, { size = 150 } = {}) {
   const cx = r;
   const cy = r;
   let angle = -Math.PI / 2;
-  const arcs = segments.map((seg) => {
+  const arcs = segments.map((seg, index) => {
     const frac = (Number(seg.value) || 0) / total;
     const start = angle;
     const end = angle + frac * Math.PI * 2;
@@ -441,9 +574,17 @@ function svgDonut(segments, { size = 150 } = {}) {
     const yi2 = cy + inner * Math.sin(end);
     const xi1 = cx + inner * Math.cos(start);
     const yi1 = cy + inner * Math.sin(start);
-    return `<path d="M${x1},${y1} A${r},${r} 0 ${large} 1 ${x2},${y2} L${xi2},${yi2} A${inner},${inner} 0 ${large} 0 ${xi1},${yi1} Z" fill="${seg.color}" />`;
+    return `
+      <path class="donut-segment" data-donut-index="${index}" data-label="${escapeHtml(seg.label || "")}" data-display="${escapeHtml(seg.display || formatPercent(frac, 0))}" d="M${x1},${y1} A${r},${r} 0 ${large} 1 ${x2},${y2} L${xi2},${yi2} A${inner},${inner} 0 ${large} 0 ${xi1},${yi1} Z" fill="${seg.color}" />
+    `;
   }).join("");
-  return `<svg class="donut" viewBox="0 0 ${size} ${size}" role="img" aria-label="구성 도넛 차트">${arcs}</svg>`;
+  return `
+    <svg class="donut interactive-donut" data-center-label="${escapeHtml(centerLabel)}" data-center-value="${escapeHtml(centerValue)}" viewBox="0 0 ${size} ${size}" role="img" aria-label="구성 도넛 차트">
+      ${arcs}
+      <text class="donut-center-title" x="${cx}" y="${cy - 5}" text-anchor="middle">${escapeHtml(centerLabel)}</text>
+      <text class="donut-center-value" x="${cx}" y="${cy + 13}" text-anchor="middle">${escapeHtml(centerValue)}</text>
+    </svg>
+  `;
 }
 
 /* ============================================================
@@ -533,6 +674,10 @@ function renderHome() {
   const totalBuyback = sumThirty("buyback");
   const totalVolume = sumThirtyVolume();
   const buybackRate = totalRevenue > 0 ? totalBuyback / totalRevenue : 0;
+  const revenueSpark = aggregateMonthly("monthlyRevenue");
+  const buybackSpark = aggregateMonthly("monthlyBuyback");
+  const volumeSpark = aggregateMonthly("monthlyVolume");
+  const coverageSpark = months.map((_, index) => Math.max(1, projects.length - (months.length - index - 1)));
 
   // sector donut (by marketCap, grouped by category)
   const catMap = new Map();
@@ -580,6 +725,7 @@ function renderHome() {
                 <span class="nm">${escapeHtml(p.name)}</span>
                 <span class="sub">${escapeHtml(p.category)} · ${escapeHtml(valueCaptureLabel(p.valueCaptureType))}</span>
               </span>
+              <span class="rank-spark">${sparkline(p.monthlyRevenue, { color: PALETTE[i % PALETTE.length], title: `${p.name} 6개월 매출 추세`, width: 86, height: 24 })}</span>
               <span class="val">
                 <b>${cfg.fmt(p)}</b>
                 ${changeSpan(cfg.change(p))}
@@ -605,21 +751,25 @@ function renderHome() {
           <div class="kpi-cell">
             <p class="kpi-label">총 30일 매출</p>
             <div class="kpi-value">${formatCurrency(totalRevenue)}</div>
+            <div class="kpi-spark">${sparkline(revenueSpark, { color: "#4ade80", title: "전체 매출 6개월 추세" })}</div>
             <div class="kpi-sub">${projects.length}개 프로토콜 합산</div>
           </div>
           <div class="kpi-cell">
             <p class="kpi-label">총 토큰 환원</p>
             <div class="kpi-value">${formatCurrency(totalBuyback)}</div>
+            <div class="kpi-spark">${sparkline(buybackSpark, { color: "#f2c84b", title: "전체 토큰 환원 6개월 추세" })}</div>
             <div class="kpi-sub pos">환원율 ${formatPercent(buybackRate)}</div>
           </div>
           <div class="kpi-cell">
             <p class="kpi-label">30일 거래량</p>
             <div class="kpi-value">${formatCurrency(totalVolume)}</div>
+            <div class="kpi-spark">${sparkline(volumeSpark, { color: "#8fb3ff", title: "전체 거래량 6개월 추세" })}</div>
             <div class="kpi-sub">Volume · 일부 TVL 대체</div>
           </div>
           <div class="kpi-cell">
             <p class="kpi-label">추적 프로토콜</p>
             <div class="kpi-value">${projects.length}</div>
+            <div class="kpi-spark">${sparkline(coverageSpark, { color: "#c9d5e8", title: "추적 커버리지 추세" })}</div>
             <div class="kpi-sub">DeFi · 온체인</div>
           </div>
         </div>
@@ -631,7 +781,7 @@ function renderHome() {
             <div><p class="card-title">섹터 구성</p><p class="card-sub">시가총액 기준 카테고리 비중</p></div>
           </div>
           <div class="donut-card">
-            ${svgDonut(sectors.map((s) => ({ value: s.cap, color: s.color })))}
+            ${svgDonut(sectors.map((s) => ({ value: s.cap, color: s.color, label: s.cat, display: `${formatPercent(s.pct, 0)} · ${formatCurrency(s.cap)}` })), { centerLabel: "전체", centerValue: formatCurrency(catTotal) })}
             <div class="donut-legend">
               ${sectors.map((s) => `
                 <div class="leg">
@@ -673,6 +823,13 @@ function renderHome() {
         </div>
       </div>
 
+      <div class="card">
+        <div class="card-head">
+          <div><p class="card-title">수익 vs 환원</p><p class="card-sub">상위 4개 프로토콜의 30일 매출 대비 토큰 환원율</p></div>
+        </div>
+        ${revenueReturnChart(projects)}
+      </div>
+
       <div class="row row-3">
         ${rankCardHtml}
       </div>
@@ -692,14 +849,16 @@ function renderAnalysis() {
     ? Number(project.circulatingSupplyPercent)
     : (project.fdv ? Number(project.marketCap) / Number(project.fdv) : null);
 
-  // revenue monthly table
   const monthly = project.monthlyRevenue || [];
-  const revRows = monthly.map((v, i) => {
-    const prev = i > 0 ? monthly[i - 1] : null;
+  const monthlyLabels = monthLabelsFor(monthly);
+  const revenueSeries = sliceSeries(monthly, monthlyLabels, state.revenueRange);
+  const revRows = revenueSeries.values.map((v, i) => {
+    const sourceIndex = revenueSeries.start + i;
+    const prev = sourceIndex > 0 ? monthly[sourceIndex - 1] : null;
     const mom = prev ? (v - prev) / prev : null;
     return `
-      <tr>
-        <td>${escapeHtml(months[i] || `${i + 1}월`)}</td>
+      <tr data-chart-row="${i}">
+        <td>${escapeHtml(revenueSeries.labels[i] || `${sourceIndex + 1}월`)}</td>
         <td>${formatCurrency(v * 1000000)}</td>
         <td class="${mom === null ? "" : mom >= 0 ? "pos" : "neg"}">${mom === null ? "-" : `${mom >= 0 ? "+" : ""}${formatPercent(mom)}`}</td>
       </tr>
@@ -764,9 +923,11 @@ function renderAnalysis() {
         <div class="card-head">
           <div><p class="card-title">프로젝트 수익</p><p class="card-sub">월별 매출 추세 · ${escapeHtml(derived.signal)}</p></div>
           <div class="toggle-row">
-            <button type="button" class="active">3M</button>
-            <button type="button">6M</button>
-            <button type="button">전체</button>
+            ${[
+              ["3M", "3M"],
+              ["6M", "6M"],
+              ["ALL", "전체"],
+            ].map(([key, label]) => `<button type="button" class="${state.revenueRange === key ? "active" : ""}" data-revenue-range="${key}">${escapeHtml(label)}</button>`).join("")}
           </div>
         </div>
         <div class="revenue-split">
@@ -775,7 +936,7 @@ function renderAnalysis() {
             <tbody>${revRows}</tbody>
           </table>
           <div class="chart-pad">
-            ${areaChart(monthly, months, { color: "#16a34a", title: `${project.name} 월별 매출` })}
+            ${areaChart(revenueSeries.values, revenueSeries.labels, { color: "#16a34a", title: `${project.name} 월별 매출`, interactive: true, chartId: "revenue" })}
           </div>
         </div>
       </div>
@@ -785,7 +946,7 @@ function renderAnalysis() {
           <div><p class="card-title">총 토큰 유통량</p><p class="card-sub">코호트별 누적 공급 구성 (2024 → 2026)</p></div>
         </div>
         <div class="chart-pad">
-          ${stackedAreaChart(supply.cohorts, supply.axisLabels, { title: `${project.name} 토큰 유통량 구성` })}
+          ${stackedAreaChart(supply.cohorts, supply.axisLabels, { title: `${project.name} 토큰 유통량 구성`, interactive: true, chartId: "supply" })}
         </div>
         <div class="stack-legend">
           ${supply.cohorts.map((c) => `<span class="leg"><i style="background:${c.color}"></i>${escapeHtml(c.label)}</span>`).join("")}
@@ -797,15 +958,18 @@ function renderAnalysis() {
         <div class="card-head">
           <div><p class="card-title">언락 일정</p><p class="card-sub">예정된 토큰 언락 · 날짜 · 코호트 · 공급 대비 · 금액</p></div>
         </div>
-        <div class="unlock-list">
-          ${unlockRows.map((r) => `
-            <div class="unlock-row">
-              <span class="u-date">${escapeHtml(r.date)}</span>
-              <span class="u-cohort"><i style="background:${r.cohortColor}"></i>${escapeHtml(r.cohortLabel)}</span>
-              <span class="u-pct">${r.pctOfSupply ? formatPercent(r.pctOfSupply, 2) : "-"}</span>
-              <span class="u-amt">${formatCurrency(r.usd)}</span>
+        <div class="unlock-layout">
+          ${unlockTimeline(unlockRows)}
+          <div class="unlock-list">
+            ${unlockRows.map((r) => `
+              <div class="unlock-row">
+                <span class="u-date">${escapeHtml(r.date)}</span>
+                <span class="u-cohort"><i style="background:${r.cohortColor}"></i>${escapeHtml(r.cohortLabel)}</span>
+                <span class="u-pct">${r.pctOfSupply ? formatPercent(r.pctOfSupply, 2) : "-"}</span>
+                <span class="u-amt">${formatCurrency(r.usd)}</span>
+              </div>
+            `).join("")}
             </div>
-          `).join("")}
         </div>
         <p class="model-note">집계 언락 데이터에서 도출한 일정이며, 코호트 귀속은 배분 비중 기준의 예시입니다.</p>
       </div>
@@ -837,6 +1001,7 @@ function renderRanking() {
   const sortKey = state.rankSort;
   const col = RANK_COLUMNS.find((c) => c.key === sortKey) || RANK_COLUMNS[0];
   const sorted = [...filtered].sort((a, b) => col.get(b) - col.get(a));
+  const maxDailyRevenue = Math.max(...sorted.map((p) => Number(p.daily?.revenue) || 0), 1);
 
   const headCells = RANK_COLUMNS.map((c) => `
     <th data-sort="${c.key}" class="${c.key === sortKey ? "active" : ""}">${escapeHtml(c.label)}${c.key === sortKey ? '<span class="arrow">▼</span>' : ""}</th>
@@ -853,8 +1018,31 @@ function renderRanking() {
           </span>
         </span>
       </td>
-      ${RANK_COLUMNS.map((c) => `<td class="${c.key === sortKey ? "active" : ""}">${c.fmt(p)}</td>`).join("")}
+      <td class="trend-cell">${sparkline(p.monthlyRevenue, { color: PALETTE[i % PALETTE.length], title: `${p.name} 6개월 매출 추세` })}</td>
+      ${RANK_COLUMNS.map((c) => {
+        const content = c.key === "revenue"
+          ? metricBar(c.get(p), maxDailyRevenue, c.fmt(p))
+          : c.fmt(p);
+        return `<td class="${c.key === sortKey ? "active" : ""}">${content}</td>`;
+      }).join("")}
     </tr>
+  `).join("");
+
+  const mobileCards = sorted.map((p, i) => `
+    <button class="ranking-card" type="button" data-open-project="${escapeHtml(p.id)}">
+      <span class="ranking-card-top">
+        ${rankBadge(i)}
+        <span>
+          <strong>${escapeHtml(p.name)}</strong>
+          <small>${escapeHtml(p.category)} · ${escapeHtml(p.token)}</small>
+        </span>
+      </span>
+      <span class="ranking-card-spark">${sparkline(p.monthlyRevenue, { color: PALETTE[i % PALETTE.length], title: `${p.name} 6개월 매출 추세` })}</span>
+      <span class="ranking-card-metrics">
+        <span><small>24h Revenue</small><b>${formatCurrency(p.daily?.revenue)}</b></span>
+        <span><small>환원수익률</small><b>${formatPercent(getBuybackYield(p))}</b></span>
+      </span>
+    </button>
   `).join("");
 
   return `
@@ -879,12 +1067,14 @@ function renderRanking() {
               <tr>
                 <th class="left">#</th>
                 <th class="left">프로젝트</th>
+                <th>6M 추세</th>
                 ${headCells}
               </tr>
             </thead>
             <tbody>${bodyRows}</tbody>
           </table>
         </div>
+        <div class="ranking-cards">${mobileCards}</div>
       </div>
     </section>
   `;
@@ -952,6 +1142,130 @@ function renderActiveTab() {
   bindTabEvents();
 }
 
+let chartTooltip = null;
+
+function getChartTooltip() {
+  if (!chartTooltip) {
+    chartTooltip = document.createElement("div");
+    chartTooltip.className = "chart-tooltip";
+    document.body.appendChild(chartTooltip);
+  }
+  return chartTooltip;
+}
+
+function closestChartHit(svg, event) {
+  const hits = Array.from(svg.querySelectorAll(".chart-hit"));
+  if (!hits.length) return null;
+  const rect = svg.getBoundingClientRect();
+  const viewBox = svg.viewBox.baseVal;
+  const svgX = viewBox.x + ((event.clientX - rect.left) / Math.max(rect.width, 1)) * viewBox.width;
+  return hits.reduce((best, hit) => {
+    const distance = Math.abs(Number(hit.dataset.x) - svgX);
+    return !best || distance < best.distance ? { hit, distance } : best;
+  }, null).hit;
+}
+
+function positionTooltip(svg, hit) {
+  const tooltip = getChartTooltip();
+  const rect = svg.getBoundingClientRect();
+  const viewBox = svg.viewBox.baseVal;
+  const x = Number(hit.dataset.x) || 0;
+  const y = Number(hit.dataset.y) || 0;
+  const clientX = rect.left + ((x - viewBox.x) / Math.max(viewBox.width, 1)) * rect.width;
+  const clientY = rect.top + ((y - viewBox.y) / Math.max(viewBox.height, 1)) * rect.height;
+  tooltip.style.left = `${clientX}px`;
+  tooltip.style.top = `${clientY}px`;
+}
+
+function setRevenueRowHighlight(index, active) {
+  const row = $(`.rev-table [data-chart-row="${index}"]`);
+  if (row) row.classList.toggle("active", active);
+}
+
+function showChartHit(svg, hit) {
+  const index = hit.dataset.chartIndex;
+  const crosshair = svg.querySelector(".chart-crosshair");
+  if (crosshair) {
+    crosshair.setAttribute("x1", hit.dataset.x);
+    crosshair.setAttribute("x2", hit.dataset.x);
+    crosshair.classList.add("active");
+  }
+  svg.querySelectorAll(".chart-point").forEach((point) => {
+    point.classList.toggle("active", point.dataset.chartPoint === index);
+  });
+
+  if (svg.dataset.chartId === "revenue") {
+    $$(".rev-table [data-chart-row]").forEach((row) => row.classList.remove("active"));
+    setRevenueRowHighlight(index, true);
+  }
+
+  const lineItems = (hit.dataset.lines || "").split("|").map((line) => line.trim()).filter(Boolean);
+  const tooltip = getChartTooltip();
+  tooltip.innerHTML = `
+    <strong>${escapeHtml(hit.dataset.label || "")}</strong>
+    <span>${escapeHtml(hit.dataset.display || "")}</span>
+    ${lineItems.map((line) => `<small>${escapeHtml(line)}</small>`).join("")}
+  `;
+  tooltip.classList.add("visible");
+  positionTooltip(svg, hit);
+}
+
+function hideChartState(svg) {
+  const tooltip = getChartTooltip();
+  tooltip.classList.remove("visible");
+  svg.querySelector(".chart-crosshair")?.classList.remove("active");
+  svg.querySelectorAll(".chart-point").forEach((point) => point.classList.remove("active"));
+  if (svg.dataset.chartId === "revenue") {
+    $$(".rev-table [data-chart-row]").forEach((row) => row.classList.remove("active"));
+  }
+}
+
+function bindInteractiveCharts() {
+  $$(".interactive-chart").forEach((svg) => {
+    const showFromEvent = (event) => {
+      const hit = closestChartHit(svg, event);
+      if (hit) showChartHit(svg, hit);
+    };
+    svg.addEventListener("pointermove", showFromEvent);
+    svg.addEventListener("pointerdown", showFromEvent);
+    svg.addEventListener("pointerleave", () => hideChartState(svg));
+  });
+
+  const revenueChart = $('.interactive-chart[data-chart-id="revenue"]');
+  if (revenueChart) {
+    $$(".rev-table [data-chart-row]").forEach((row) => {
+      row.addEventListener("pointerenter", () => {
+        const hit = revenueChart.querySelector(`.chart-hit[data-chart-index="${row.dataset.chartRow}"]`);
+        if (hit) showChartHit(revenueChart, hit);
+      });
+      row.addEventListener("pointerleave", () => hideChartState(revenueChart));
+    });
+  }
+}
+
+function bindDonuts() {
+  $$(".interactive-donut").forEach((svg) => {
+    const title = svg.querySelector(".donut-center-title");
+    const value = svg.querySelector(".donut-center-value");
+    const reset = () => {
+      svg.querySelectorAll(".donut-segment").forEach((segment) => segment.classList.remove("active"));
+      if (title) title.textContent = svg.dataset.centerLabel || "";
+      if (value) value.textContent = svg.dataset.centerValue || "";
+    };
+
+    svg.querySelectorAll(".donut-segment").forEach((segment) => {
+      segment.addEventListener("pointerenter", () => {
+        svg.querySelectorAll(".donut-segment").forEach((item) => item.classList.remove("active"));
+        segment.classList.add("active");
+        if (title) title.textContent = segment.dataset.label || "";
+        if (value) value.textContent = segment.dataset.display || "";
+      });
+    });
+    svg.addEventListener("pointerleave", reset);
+    reset();
+  });
+}
+
 function bindTabEvents() {
   // open a project in 프로젝트 분석
   $$("[data-open-project]").forEach((el) => {
@@ -1008,6 +1322,16 @@ function bindTabEvents() {
     });
   });
 
+  $$("[data-revenue-range]").forEach((el) => {
+    el.addEventListener("click", () => {
+      state.revenueRange = el.dataset.revenueRange;
+      renderActiveTab();
+    });
+  });
+
+  bindInteractiveCharts();
+  bindDonuts();
+
   // settings save
   const saveBtn = $("#saveSettingsButton");
   if (saveBtn) saveBtn.addEventListener("click", saveSettings);
@@ -1019,6 +1343,7 @@ function syncGlobalSearch() {
 }
 
 function render() {
+  document.body.classList.toggle("is-refreshing", state.isRefreshing);
   renderTabs();
   renderActiveTab();
   syncGlobalSearch();
